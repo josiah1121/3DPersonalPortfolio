@@ -4,8 +4,7 @@ body {
     background: #000;
   }
   
-  /* Optional: cursor style for better feel */
   canvas {
     display: block;
-    cursor: none; /* hides default cursor for cleaner look */
+    cursor: none;
   }
