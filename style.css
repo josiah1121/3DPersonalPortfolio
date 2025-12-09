@@ -1,10 +1,11 @@
+/* style.css */ 
 body {
     margin: 0;
     overflow: hidden;
     background: #000;
+    cursor: none;
   }
   
   canvas {
     display: block;
-    cursor: none;
   }

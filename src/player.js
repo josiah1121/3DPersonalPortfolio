@@ -1,3 +1,4 @@
+//player.js
 import * as THREE from 'three';
 
 export function createPlayer(scene) {
@@ -35,10 +36,10 @@ export function createPlayer(scene) {
     textPos.y - 100,     // 120 units below the text (perfect eye-level view)
     textPos.z + 180      // 180 units in front of the text
   );
-  
+
   group.lookAt(textPos)
 
-  scene.add(group);
+  //scene.add(group);
 
   // === MOVEMENT SYSTEM (fixed & working 100%) ===
   const keys = { w: false, a: false, s: false, d: false };
