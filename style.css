@@ -1,11 +1,11 @@
+/* style.css */ 
 body {
     margin: 0;
     overflow: hidden;
     background: #000;
+    cursor: none;
   }
   
-  /* Optional: cursor style for better feel */
   canvas {
     display: block;
-    cursor: none; /* hides default cursor for cleaner look */
   }
