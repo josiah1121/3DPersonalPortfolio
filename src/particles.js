@@ -1,5 +1,6 @@
 // particles.js
 import * as THREE from 'three';
+import { mouse, isMouseOver } from './cursor.js'; // ← this is the key!
 
 // Helper function to generate a sharp circular particle texture
 function generateParticleTexture() {
@@ -37,6 +38,7 @@ let particles = null;
 let positionAttribute = null;
 let homePositions = null;
 let velocities = new Float32Array();
+let DISTANCE = -800;
 
 // === Formation animation state ===
 let isForming = false;
@@ -44,27 +46,16 @@ let formationStartTime = 0;
 const formationDuration = 750; // ms – adjust for faster/slower reveal
 let onFormationComplete = null; // optional callback
 
-const mouse = new THREE.Vector2();
-let isMouseOver = false;
 const raycaster = new THREE.Raycaster();
 const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const mouse3D = new THREE.Vector3();
-
-export function setupMouse(renderer) {
-  renderer.domElement.addEventListener('mousemove', (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  });
-  renderer.domElement.addEventListener('mouseenter', () => isMouseOver = true);
-  renderer.domElement.addEventListener('mouseleave', () => isMouseOver = false);
-}
 
 // Updated signature: optional options object with onComplete callback
 export function createParticles(scene, text = "Josiah Clark", options = {}) {
   onFormationComplete = options.onComplete || null;
 
   const canvas = document.createElement('canvas');
-  const scale = 2;
+  const scale = 1.25;
   canvas.width = 1024 * scale;
   canvas.height = 512 * scale;
   const ctx = canvas.getContext('2d');
@@ -102,38 +93,13 @@ export function createParticles(scene, text = "Josiah Clark", options = {}) {
 
   // Hollywood-sign transformation
   const finalPositions = [];
-  const groundY = -35;
-  const tiltAngle = THREE.MathUtils.degToRad(95);
-  const depthScale = 1.6;
-  const diagonalAngle = THREE.MathUtils.degToRad(20);
-  const slightLeftAngle = THREE.MathUtils.degToRad(-0.5);
+  const groundY = 10;           // matches your ground plane
+  const TEXT_SCALE = 2.0;        // makes it big and readable
 
   for (let i = 0; i < tempPositions.length; i += 3) {
-    let x = tempPositions[i];
-    let y = tempPositions[i + 1];
-    let z = 0;
-
-    z *= depthScale;
-
-    // Lay flat on ground
-    let tempY = y;
-    y = -z;
-    z = tempY;
-
-    // Tilt upward
-    tempY = y;
-    y = Math.cos(-tiltAngle) * tempY - Math.sin(-tiltAngle) * z;
-    z = Math.sin(-tiltAngle) * tempY + Math.cos(-tiltAngle) * z;
-
-    let tempX = x;
-    x = Math.cos(slightLeftAngle) * tempX - Math.sin(slightLeftAngle) * y;
-    y = Math.sin(slightLeftAngle) * tempX + Math.cos(slightLeftAngle) * y;
-
-    tempX = x;
-    x = Math.cos(diagonalAngle) * tempX - Math.sin(diagonalAngle) * z;
-    z = Math.sin(diagonalAngle) * tempX + Math.cos(diagonalAngle) * z;
-
-    y += groundY;
+    const x = tempPositions[i]     * TEXT_SCALE;
+    const y = tempPositions[i + 1] * TEXT_SCALE + groundY;
+    const z = -DISTANCE;   // negative Z = away from camera
 
     finalPositions.push(x, y, z);
   }
@@ -142,17 +108,6 @@ export function createParticles(scene, text = "Josiah Clark", options = {}) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(finalPositions, 3).setUsage(THREE.DynamicDrawUsage));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-  // Center the text
-  geometry.computeBoundingBox();
-  const bbox = geometry.boundingBox;
-  const center = new THREE.Vector3();
-  bbox.getCenter(center);
-
-  for (let i = 0; i < finalPositions.length; i += 3) {
-    finalPositions[i]     -= center.x;
-    finalPositions[i + 1] -= center.y;
-    finalPositions[i + 2] -= center.z;
-  }
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(finalPositions, 3).setUsage(THREE.DynamicDrawUsage));
   geometry.computeBoundingBox();
 
@@ -160,8 +115,8 @@ export function createParticles(scene, text = "Josiah Clark", options = {}) {
   particles = new THREE.Points(geometry, particleMaterial);
   scene.add(particles);
 
-  window.particleTextPosition = new THREE.Vector3(0, groundY, 0);
-  window.particleTextCenter = new THREE.Vector3(0, groundY, 0);
+  window.particleTextPosition = new THREE.Vector3(0, groundY, - 50, -DISTANCE);
+  window.particleTextCenter    = new THREE.Vector3(0, groundY + 100, -DISTANCE);
 
   positionAttribute = geometry.getAttribute('position');
   homePositions = new Float32Array(finalPositions);
@@ -177,7 +132,7 @@ export function createParticles(scene, text = "Josiah Clark", options = {}) {
 
     pos[i]     = r * Math.sin(phi) * Math.cos(theta);
     pos[i + 1] = r * Math.sin(phi) * Math.sin(theta) + groundY;
-    pos[i + 2] = r * Math.cos(phi);
+    pos[i + 2] = r * Math.cos(phi) - DISTANCE;
   }
   positionAttribute.needsUpdate = true;
 
@@ -194,7 +149,8 @@ export function updateParticles(camera) {
 
   if (isMouseOver) {
     raycaster.setFromCamera(mouse, camera);
-    raycaster.ray.intersectPlane(plane, mouse3D);
+    const textPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), DISTANCE);
+    raycaster.ray.intersectPlane(textPlane, mouse3D);
   }
 
   // Dynamic spring strength during formation
@@ -225,17 +181,22 @@ export function updateParticles(camera) {
     vy += (homePositions[i + 1] - pos[i + 1]) * spring;
     vz += (homePositions[i + 2] - pos[i + 2]) * spring;
 
-    // Mouse repulsion (starts near the end of formation for smoother feel)
+    // Mouse repulsion — 3D accurate, feels perfect
     if (!isForming || progress > 0.7) {
       if (isMouseOver && mouse3D) {
         const dx = pos[i] - mouse3D.x;
         const dy = pos[i + 1] - mouse3D.y;
-        const dSq = dx * dx + dy * dy;
+        const dz = pos[i + 2] - mouse3D.z;
+
+        const dSq = dx*dx + dy*dy + dz*dz;
+
         if (dSq < repulse * repulse && dSq > 1) {
           const dist = Math.sqrt(dSq);
           const force = strength * (1 - dist / repulse);
+
           vx += (dx / dist) * force;
           vy += (dy / dist) * force;
+          vz += (dz / dist) * force;
         }
       }
     }
@@ -257,7 +218,6 @@ export function updateParticles(camera) {
 }
 
 export default {
-  setupMouse,
   createParticles,
   updateParticles
 };

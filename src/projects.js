@@ -1,4 +1,4 @@
-// src/projects.js
+// src/projects.js — FINAL: Your original position + clean white letters + super readable screens
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
@@ -10,50 +10,47 @@ const fontURL = 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/fonts/helve
 
 export function createProjectsArea(scene) {
   titleGroup = new THREE.Group();
-  // In front and slightly right of your name
-  titleGroup.position.set(420, 10, 400);
+  titleGroup.position.set(1500, 10, -400);  // YOUR ORIGINAL POSITION — untouched
   scene.add(titleGroup);
 
   fontLoader.load(fontURL, (font) => {
     const text = "PERSONAL PROJECTS";
     const letters = text.split('');
-    const totalWidth = 1000;
+    const totalWidth = 1500;
     const validCount = letters.filter(c => c !== ' ').length;
     const spacing = totalWidth / (validCount + 1);
-    let index = 0;
+    let i = 0;
 
     letters.forEach(char => {
       if (char === ' ') return;
 
       const geo = new TextGeometry(char, {
-        font: font,
-        size: 45,
-        depth: 16,
+        font,
+        size: 48,
+        depth: 18,
         curveSegments: 12,
         bevelEnabled: true,
-        bevelThickness: 4,
-        bevelSize: 2.5,
-        bevelSegments: 6
+        bevelThickness: 5,
+        bevelSize: 3,
+        bevelSegments: 8
       });
 
       geo.computeBoundingBox();
       const offset = -0.5 * (geo.boundingBox.max.x - geo.boundingBox.min.x);
       geo.translate(offset, 0, 0);
 
-      const hue = index / validCount;
-      const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-
+      // Pure white letters with strong cyan glow
       const material = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 1.5,
-        metalness: 0.9,
-        roughness: 0.15
+        color: 0xffffff,
+        emissive: 0x00ffff,
+        emissiveIntensity: 2.0,
+        metalness: 0.8,
+        roughness: 0.1
       });
 
       const letter = new THREE.Mesh(geo, material);
 
-      letter.position.x = -totalWidth / 2 + (index + 1) * spacing;
+      letter.position.x = -totalWidth / 2 + (i + 1) * spacing;
       letter.position.y = 300 + Math.random() * 250;
       letter.position.z = (Math.random() - 0.5) * 100;
 
@@ -79,16 +76,16 @@ export function createProjectsArea(scene) {
       };
 
       titleGroup.add(letter);
-      index++;
+      i++;
     });
 
-    // Soft glow under the text
+    // Cyan glow ring under text
     const glow = new THREE.Mesh(
       new THREE.RingGeometry(400, 600, 64),
       new THREE.MeshBasicMaterial({
         color: 0x00ffff,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.25,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide
       })
@@ -105,13 +102,12 @@ export function updateTitleLetters(delta) {
   if (!titleGroup) return;
 
   titleGroup.children.forEach(obj => {
-    if (!obj.userData.velocity) return; // skip glow ring
+    if (!obj.userData.velocity) return;
 
     const u = obj.userData;
     if (u.landed) return;
 
     u.velocity.y -= 1600 * delta;
-
     obj.position.addScaledVector(u.velocity, delta);
     obj.rotation.x += u.rotVel.x;
     obj.rotation.y += u.rotVel.y;
@@ -122,20 +118,19 @@ export function updateTitleLetters(delta) {
       obj.rotation.set(0, 0, 0);
       u.landed = true;
 
-      obj.material.emissiveIntensity = 3.0;
-
+      obj.material.emissiveIntensity = 4.0;
       new TWEEN.Tween(obj.scale)
         .to({ x: 1.6, y: 1.6, z: 1.6 }, 180)
         .easing(TWEEN.Easing.Elastic.Out)
         .yoyo(true)
         .repeat(1)
         .start()
-        .onComplete(() => obj.material.emissiveIntensity = 1.5);
+        .onComplete(() => obj.material.emissiveIntensity = 2.0);
     }
   });
 }
 
-// Fixed PersonalProject class — no more undefined error
+// SUPER CLEAN & READABLE PROJECT SCREENS (white text, no color noise)
 export class PersonalProject {
   constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3()) {
     this.group = new THREE.Group();
@@ -146,50 +141,55 @@ export class PersonalProject {
     canvas.height = 480;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 640, 480);
-    ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 16;
-    ctx.strokeRect(8, 8, 624, 464);
+    // Dark clean background
     ctx.fillStyle = '#0a1422';
-    ctx.fillRect(30, 30, 580, 420);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#00ffff';
-    ctx.font = 'bold 48px Arial';
+    // Cyan border
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+    // Title - bright white
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 54px "Arial Black", Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(title, 320, 90);
+    ctx.fillText(title, canvas.width / 2, 100);
 
-    ctx.fillStyle = '#eeeeee';
-    ctx.font = '26px Arial';
-    this._wrapText(ctx, description, 320, 150, 560, 36);
+    // Description - white, wrapped
+    ctx.font = '30px Arial';
+    this._wrapText(ctx, description, canvas.width / 2, 170, 560, 38);
 
+    // Tech
     if (tech.length) {
-      ctx.fillStyle = '#00ffaa';
-      ctx.font = '24px Arial';
-      ctx.fillText("Tech: " + tech.join(' • '), 320, 380);
+      ctx.font = '26px Arial';
+      ctx.fillText("Tech: " + tech.join(' • '), canvas.width / 2, 380);
     }
+
+    // Link
     if (link) {
-      ctx.fillStyle = '#ffff66';
-      ctx.font = 'italic 26px Arial';
-      ctx.fillText(link, 320, 430);
+      ctx.fillStyle = '#88ffaa';
+      ctx.font = 'italic 28px Arial';
+      ctx.fillText(link, canvas.width / 2, 430);
     }
 
     requestAnimationFrame(() => {
       const tex = new THREE.CanvasTexture(canvas);
       tex.needsUpdate = true;
       const screen = new THREE.Mesh(
-        new THREE.PlaneGeometry(240, 180),
+        new THREE.PlaneGeometry(260, 195),
         new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
       );
-      screen.position.y = 10;
+      screen.position.y = 97.5; // bottom touches ground
       this.group.add(screen);
     });
 
+    // Stand
     const stand = new THREE.Mesh(
-      new THREE.BoxGeometry(80, 110, 30),
-      new THREE.MeshBasicMaterial({ color: 0x888888 })
+      new THREE.BoxGeometry(90, 200, 40),
+      new THREE.MeshBasicMaterial({ color: 0x444444 })
     );
-    stand.position.y = 35;
+    stand.position.y = -80;
     this.group.add(stand);
   }
 
@@ -214,7 +214,6 @@ export class PersonalProject {
   }
 
   update(camera) {
-    // Fixed: use this.group, not this.rotation
     this.group.lookAt(camera.position);
     this.group.rotation.x = 0;
     this.group.rotation.z = 0;

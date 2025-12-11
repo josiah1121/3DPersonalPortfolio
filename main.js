@@ -13,11 +13,10 @@ import {
 // Correct import — works 100%
 import TWEEN from 'https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23/dist/tween.esm.js';
 
-const { setupMouse, createParticles, updateParticles } = Particles;
+const {createParticles, updateParticles } = Particles;
 
 const { scene, camera, renderer, controls } = initScene();
 
-setupMouse(renderer);
 
 const cursor = setupCursor(scene, camera, renderer);
 
