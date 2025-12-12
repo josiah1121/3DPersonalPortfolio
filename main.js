@@ -5,6 +5,7 @@ import { initShootingStars, updateShootingStars } from './src/stars.js';
 import Particles from './src/particles.js';
 import { setupCursor } from './src/cursor.js';
 import { createPlayer } from './src/player.js';
+import { initDust, updateDust } from './dust.js';
 import { 
   createProjectsArea, 
   PersonalProject, 
@@ -29,6 +30,8 @@ createParticles(scene, "Josiah Clark", {
 });
 
 initShootingStars(scene, camera);
+
+initDust(scene, camera);
 
 const player = createPlayer(scene);
 
@@ -80,6 +83,7 @@ function animate() {
   updateParticles(camera);
   player.update(delta);
   cursor.update();
+  updateDust();
   updateShootingStars();
 
   // Falling letters physics + bounce
