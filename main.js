@@ -5,7 +5,8 @@ import { initShootingStars, updateShootingStars } from './src/stars.js';
 import Particles from './src/particles.js';
 import { setupCursor } from './src/cursor.js';
 import { createPlayer } from './src/player.js';
-import { initDust, updateDust } from './dust.js';
+import { initDust, updateDust } from './src/dust.js';
+
 import { 
   createProjectsArea, 
   PersonalProject, 
@@ -53,7 +54,7 @@ addProject({
   description: "Real-time AI music composition in the browser using WebGPU and a custom RNN.",
   tech: ["TypeScript", "WebGPU", "TensorFlow.js"],
   link: "github.com/josiahclark/neural-music"
-}, new THREE.Vector3(-200, 0, 0));
+}, new THREE.Vector3(-300, 0, 0));
 
 addProject({
   title: "This 3D Portfolio",
@@ -67,7 +68,7 @@ addProject({
   description: "144+ fps SDF renderer written from scratch in WebGL2 + Rust/WASM.",
   tech: ["WebGL2", "GLSL", "Rust", "WASM"],
   link: "github.com/josiahclark/ray-marcher"
-}, new THREE.Vector3(200, 0, 0, 0));
+}, new THREE.Vector3(300, 0, 0, 0));
 
 // ————————————————————————
 // ANIMATION LOOP

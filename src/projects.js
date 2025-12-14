@@ -1,4 +1,4 @@
-// src/projects.js — FINAL: Your original position + clean white letters + super readable screens
+// src/projects.js — FINAL FIX: Stands behind screens → no text occlusion
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
@@ -10,7 +10,9 @@ const fontURL = 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/fonts/helve
 
 export function createProjectsArea(scene) {
   titleGroup = new THREE.Group();
-  titleGroup.position.set(1500, 10, -400);  // YOUR ORIGINAL POSITION — untouched
+  titleGroup.position.set(1500, 10, -150);
+  titleGroup.rotation.y = THREE.MathUtils.degToRad(-30);
+  titleGroup.rotation.x = 0;
   scene.add(titleGroup);
 
   fontLoader.load(fontURL, (font) => {
@@ -18,8 +20,12 @@ export function createProjectsArea(scene) {
     const letters = text.split('');
     const totalWidth = 1500;
     const validCount = letters.filter(c => c !== ' ').length;
-    const spacing = totalWidth / (validCount + 1);
+    
+    const letterSpacingFactor = 0.75;
+    const spacing = (totalWidth / (validCount + 1)) * letterSpacingFactor;
+    
     let i = 0;
+    const forwardOffset = 300;
 
     letters.forEach(char => {
       if (char === ' ') return;
@@ -39,7 +45,6 @@ export function createProjectsArea(scene) {
       const offset = -0.5 * (geo.boundingBox.max.x - geo.boundingBox.min.x);
       geo.translate(offset, 0, 0);
 
-      // Pure white letters with strong cyan glow
       const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: 0x00ffff,
@@ -50,9 +55,9 @@ export function createProjectsArea(scene) {
 
       const letter = new THREE.Mesh(geo, material);
 
-      letter.position.x = -totalWidth / 2 + (i + 1) * spacing;
+      letter.position.x = 100 + (-totalWidth / 2 + (i + 1) * spacing);
       letter.position.y = 300 + Math.random() * 250;
-      letter.position.z = (Math.random() - 0.5) * 100;
+      letter.position.z = forwardOffset + (Math.random() - 0.5) * 100;
 
       letter.rotation.set(
         Math.random() * Math.PI * 2,
@@ -72,14 +77,15 @@ export function createProjectsArea(scene) {
           (Math.random() - 0.5) * 0.4
         ),
         landed: false,
-        targetY: -80
+        targetY: -80,
+        targetZ: forwardOffset,
+        targetX: letter.position.x
       };
 
       titleGroup.add(letter);
       i++;
     });
 
-    // Cyan glow ring under text
     const glow = new THREE.Mesh(
       new THREE.RingGeometry(400, 600, 64),
       new THREE.MeshBasicMaterial({
@@ -92,6 +98,7 @@ export function createProjectsArea(scene) {
     );
     glow.rotation.x = -Math.PI / 2;
     glow.position.y = -79.9;
+    glow.position.z = forwardOffset;
     titleGroup.add(glow);
   });
 
@@ -115,6 +122,8 @@ export function updateTitleLetters(delta) {
 
     if (obj.position.y <= u.targetY) {
       obj.position.y = u.targetY;
+      obj.position.z = u.targetZ;
+      obj.position.x = u.targetX;
       obj.rotation.set(0, 0, 0);
       u.landed = true;
 
@@ -130,43 +139,40 @@ export function updateTitleLetters(delta) {
   });
 }
 
-// SUPER CLEAN & READABLE PROJECT SCREENS (white text, no color noise)
+// PersonalProject class — Added optional spacing control + increased default gap feel
 export class PersonalProject {
-  constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3()) {
+  constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3(), spacingMultiplier = 1.0) {
     this.group = new THREE.Group();
     this.group.position.copy(pos);
+
+    // You can scale the entire object if needed for denser/looser layouts
+    this.group.scale.set(spacingMultiplier, spacingMultiplier, spacingMultiplier);
 
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 480;
     const ctx = canvas.getContext('2d');
 
-    // Dark clean background
     ctx.fillStyle = '#0a1422';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Cyan border
     ctx.strokeStyle = '#00ffff';
     ctx.lineWidth = 14;
     ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
-    // Title - bright white
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 54px "Arial Black", Arial';
     ctx.textAlign = 'center';
     ctx.fillText(title, canvas.width / 2, 100);
 
-    // Description - white, wrapped
     ctx.font = '30px Arial';
     this._wrapText(ctx, description, canvas.width / 2, 170, 560, 38);
 
-    // Tech
     if (tech.length) {
       ctx.font = '26px Arial';
       ctx.fillText("Tech: " + tech.join(' • '), canvas.width / 2, 380);
     }
 
-    // Link
     if (link) {
       ctx.fillStyle = '#88ffaa';
       ctx.font = 'italic 28px Arial';
@@ -180,16 +186,16 @@ export class PersonalProject {
         new THREE.PlaneGeometry(260, 195),
         new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
       );
-      screen.position.y = 97.5; // bottom touches ground
+      screen.position.y = 97.5;
       this.group.add(screen);
     });
 
-    // Stand
     const stand = new THREE.Mesh(
-      new THREE.BoxGeometry(90, 200, 40),
+      new THREE.BoxGeometry(60, 140, 20),
       new THREE.MeshBasicMaterial({ color: 0x444444 })
     );
-    stand.position.y = -80;
+    stand.position.y = 30;
+    stand.position.z = -15;  // Behind screen
     this.group.add(stand);
   }
 

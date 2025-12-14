@@ -13,7 +13,7 @@ export function initScene() {
     60,
     window.innerWidth / window.innerHeight,
     0.1,
-    10000
+    20000
   // far enough for the huge ground
   );
 
