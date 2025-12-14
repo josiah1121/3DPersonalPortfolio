@@ -1,4 +1,4 @@
-// src/projects.js — FINAL FIX: Stands behind screens → no text occlusion
+// src/projects.js — All billboards uniform size (large enough for longest content)
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
@@ -9,6 +9,7 @@ const fontLoader = new FontLoader();
 const fontURL = 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/fonts/helvetiker_bold.typeface.json';
 
 export function createProjectsArea(scene) {
+  // ... (title code unchanged)
   titleGroup = new THREE.Group();
   titleGroup.position.set(1500, 10, -150);
   titleGroup.rotation.y = THREE.MathUtils.degToRad(-30);
@@ -106,6 +107,7 @@ export function createProjectsArea(scene) {
 }
 
 export function updateTitleLetters(delta) {
+  // unchanged
   if (!titleGroup) return;
 
   titleGroup.children.forEach(obj => {
@@ -124,7 +126,9 @@ export function updateTitleLetters(delta) {
       obj.position.y = u.targetY;
       obj.position.z = u.targetZ;
       obj.position.x = u.targetX;
-      obj.rotation.set(0, 0, 0);
+      
+      obj.rotation.set(THREE.MathUtils.degToRad(-12), 0, 0);
+      
       u.landed = true;
 
       obj.material.emissiveIntensity = 4.0;
@@ -139,79 +143,143 @@ export function updateTitleLetters(delta) {
   });
 }
 
-// PersonalProject class — Added optional spacing control + increased default gap feel
 export class PersonalProject {
   constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3(), spacingMultiplier = 1.0) {
     this.group = new THREE.Group();
     this.group.position.copy(pos);
-
-    // You can scale the entire object if needed for denser/looser layouts
     this.group.scale.set(spacingMultiplier, spacingMultiplier, spacingMultiplier);
 
+    // Uniform large canvas — fits even the longest project perfectly
     const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
+    canvas.width = 1408;
+    canvas.height = 1056;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0a1422';
+    // Dark holographic background
+    ctx.fillStyle = 'rgba(8, 15, 35, 0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Subtle scanlines
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.03)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < canvas.height; y += 10) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Neon cyan borders
     ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 14;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    ctx.lineWidth = 20;
+    ctx.strokeRect(45, 45, canvas.width - 90, canvas.height - 90);
+    ctx.lineWidth = 12;
+    ctx.strokeRect(70, 70, canvas.width - 140, canvas.height - 140);
 
+    // Title — large and bold
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 54px "Arial Black", Arial';
+    ctx.font = 'bold 104px "Arial Black", Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(title, canvas.width / 2, 100);
+    ctx.shadowColor = '#00ffff';
+    ctx.shadowBlur = 30;
+    this._wrapText(ctx, title, canvas.width / 2, 170, 1240, 120);
 
-    ctx.font = '30px Arial';
-    this._wrapText(ctx, description, canvas.width / 2, 170, 560, 38);
+    // Description
+    ctx.font = '54px Arial';
+    ctx.fillStyle = '#aaffff';
+    ctx.shadowBlur = 18;
+    this._wrapText(ctx, description, canvas.width / 2, 330, 1240, 78);
 
+    // Tech stack
     if (tech.length) {
-      ctx.font = '26px Arial';
-      ctx.fillText("Tech: " + tech.join(' • '), canvas.width / 2, 380);
+      ctx.font = '50px Arial';
+      ctx.fillStyle = '#00ffff';
+      ctx.shadowBlur = 20;
+      this._wrapText(ctx, "Tech: " + tech.join(' • '), canvas.width / 2, 700, 1240, 68);
     }
 
+    // GitHub link
     if (link) {
-      ctx.fillStyle = '#88ffaa';
-      ctx.font = 'italic 28px Arial';
-      ctx.fillText(link, canvas.width / 2, 430);
+      ctx.fillStyle = '#aaffaa';
+      ctx.font = 'italic 52px Arial';
+      ctx.shadowBlur = 20;
+      this._wrapText(ctx, link, canvas.width / 2, 880, 1240, 68);
     }
+
+    ctx.shadowBlur = 0;
 
     requestAnimationFrame(() => {
       const tex = new THREE.CanvasTexture(canvas);
       tex.needsUpdate = true;
+
+      const screenMaterial = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.98,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+
       const screen = new THREE.Mesh(
-        new THREE.PlaneGeometry(260, 195),
-        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+        new THREE.PlaneGeometry(570, 427.5),  // Uniform large size
+        screenMaterial
       );
-      screen.position.y = 97.5;
+      screen.position.y = 250;
       this.group.add(screen);
+
+      const glowBack = new THREE.Mesh(
+        new THREE.PlaneGeometry(600, 457.5),
+        new THREE.MeshBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: 0.15,
+          blending: THREE.AdditiveBlending
+        })
+      );
+      glowBack.position.y = 250;
+      glowBack.position.z = -12;
+      this.group.add(glowBack);
     });
 
-    const stand = new THREE.Mesh(
-      new THREE.BoxGeometry(60, 140, 20),
-      new THREE.MeshBasicMaterial({ color: 0x444444 })
+    // Glowing base
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(90, 120, 25, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      })
     );
-    stand.position.y = 30;
-    stand.position.z = -15;  // Behind screen
-    this.group.add(stand);
+    base.position.y = -10;
+    this.group.add(base);
+
+    // Short center pillar
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 80, 40),
+      new THREE.MeshBasicMaterial({ color: 0x0f1a33 })
+    );
+    pillar.position.y = 30;
+    pillar.position.z = 12;
+    this.group.add(pillar);
   }
 
   _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
     const words = text.split(' ');
     let line = '';
     let cy = y;
+
     for (const word of words) {
-      const test = line + word + ' ';
-      if (ctx.measureText(test).width > maxWidth && line) {
-        ctx.fillText(line, x, cy);
+      const testLine = line + word + ' ';
+      if (ctx.measureText(testLine).width > maxWidth && line !== '') {
+        ctx.fillText(line.trim(), x, cy);
         line = word + ' ';
         cy += lineHeight;
-      } else line = test;
+      } else {
+        line = testLine;
+      }
     }
-    ctx.fillText(line, x, cy);
+    ctx.fillText(line.trim(), x, cy);
   }
 
   addTo(area) {
