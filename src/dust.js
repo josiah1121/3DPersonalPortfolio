@@ -4,11 +4,11 @@ import * as THREE from 'three';
 let scene;
 let dustSystem;
 
-const DUST_COUNT = 1100;           // Fewer = more elegant
-const SPREAD_X = 2800;             // Wide left/right — covers full screen
-const SPREAD_Z = 1800;             // Forward/backward depth
-const HEIGHT_MIN = 40;
-const HEIGHT_MAX = 720;
+const DUST_COUNT = 4000;           // Fewer = more elegant
+const SPREAD_X = 3500;             // Wide left/right — covers full screen
+const SPREAD_Z = 4000;             // Forward/backward depth
+const HEIGHT_MIN = 0;
+const HEIGHT_MAX = 1400;
 
 export function initDust(_scene) {
   scene = _scene;

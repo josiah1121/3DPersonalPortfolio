@@ -39,11 +39,11 @@ export function initShootingStars(_scene, _camera) {
   createStaticStarfield();
 
   // 12 total meteors — some fire, some ice
-  for (let i = 0; i < 12; i++) createMeteor();
+  for (let i = 0; i < 24; i++) createMeteor();
 }
 
 function createStaticStarfield() {
-  const count = 8000;
+  const count = 16000;
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
 
@@ -77,7 +77,7 @@ function createStaticStarfield() {
 }
 
 function createMeteor() {
-    const maxParticles = 1600;
+    const maxParticles = 3200;
   
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(maxParticles * 3);
@@ -126,7 +126,7 @@ function createMeteor() {
       age: 0,
       fadeProgress: 0,
       isFading: false,
-      resetDelay: 1400 + Math.random() * 2600
+      resetDelay: Math.random() * 2600
     });
   }
 
