@@ -8,7 +8,8 @@ import { createPlayer } from './src/player.js';
 import { initDust, updateDust } from './src/dust.js';
 import { createAboutArea, updateAboutLetters } from './src/about.js';
 import { createExperienceArea } from './src/experience.js';
-import { createSkillsArea, updateSkills } from './src/skills.js';
+import { createSkillsArea, updateSkills, setOrbitControls } from './src/skills.js';
+import { createSkillsTitle, updateSkillsTitle } from './src/skillsTitle.js';
 import { createContactArea } from './src/contact.js';
 
 import { 
@@ -102,7 +103,9 @@ addProject({
 //const aboutArea = createAboutArea(scene);
 //const experienceArea = createExperienceArea(scene);
 const skillsArea = createSkillsArea(scene);
+const skillsTitle = createSkillsTitle(scene, skillsArea);
 //const contactArea = createContactArea(scene);
+setOrbitControls(controls);
 
 // ————————————————————————
 // ANIMATION LOOP
@@ -139,6 +142,7 @@ function animate() {
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   });
   updateSkills(camera, mouse, raycaster);
+  updateSkillsTitle(camera, delta);
 }
 
 animate();
