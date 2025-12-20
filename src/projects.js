@@ -1,4 +1,4 @@
-// src/projects.js — FINAL: Your original position + clean white letters + super readable screens
+// src/projects.js — All billboards uniform size (large enough for longest content)
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
@@ -9,8 +9,11 @@ const fontLoader = new FontLoader();
 const fontURL = 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/fonts/helvetiker_bold.typeface.json';
 
 export function createProjectsArea(scene) {
+  // ... (title code unchanged)
   titleGroup = new THREE.Group();
-  titleGroup.position.set(1500, 10, -400);  // YOUR ORIGINAL POSITION — untouched
+  titleGroup.position.set(1500, 10, -150);
+  titleGroup.rotation.y = THREE.MathUtils.degToRad(-30);
+  titleGroup.rotation.x = 0;
   scene.add(titleGroup);
 
   fontLoader.load(fontURL, (font) => {
@@ -18,8 +21,12 @@ export function createProjectsArea(scene) {
     const letters = text.split('');
     const totalWidth = 1500;
     const validCount = letters.filter(c => c !== ' ').length;
-    const spacing = totalWidth / (validCount + 1);
+    
+    const letterSpacingFactor = 0.75;
+    const spacing = (totalWidth / (validCount + 1)) * letterSpacingFactor;
+    
     let i = 0;
+    const forwardOffset = 300;
 
     letters.forEach(char => {
       if (char === ' ') return;
@@ -39,7 +46,6 @@ export function createProjectsArea(scene) {
       const offset = -0.5 * (geo.boundingBox.max.x - geo.boundingBox.min.x);
       geo.translate(offset, 0, 0);
 
-      // Pure white letters with strong cyan glow
       const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: 0x00ffff,
@@ -50,9 +56,9 @@ export function createProjectsArea(scene) {
 
       const letter = new THREE.Mesh(geo, material);
 
-      letter.position.x = -totalWidth / 2 + (i + 1) * spacing;
+      letter.position.x = 100 + (-totalWidth / 2 + (i + 1) * spacing);
       letter.position.y = 300 + Math.random() * 250;
-      letter.position.z = (Math.random() - 0.5) * 100;
+      letter.position.z = forwardOffset + (Math.random() - 0.5) * 100;
 
       letter.rotation.set(
         Math.random() * Math.PI * 2,
@@ -72,14 +78,15 @@ export function createProjectsArea(scene) {
           (Math.random() - 0.5) * 0.4
         ),
         landed: false,
-        targetY: -80
+        targetY: -80,
+        targetZ: forwardOffset,
+        targetX: letter.position.x
       };
 
       titleGroup.add(letter);
       i++;
     });
 
-    // Cyan glow ring under text
     const glow = new THREE.Mesh(
       new THREE.RingGeometry(400, 600, 64),
       new THREE.MeshBasicMaterial({
@@ -92,6 +99,7 @@ export function createProjectsArea(scene) {
     );
     glow.rotation.x = -Math.PI / 2;
     glow.position.y = -79.9;
+    glow.position.z = forwardOffset;
     titleGroup.add(glow);
   });
 
@@ -99,6 +107,7 @@ export function createProjectsArea(scene) {
 }
 
 export function updateTitleLetters(delta) {
+  // unchanged
   if (!titleGroup) return;
 
   titleGroup.children.forEach(obj => {
@@ -115,7 +124,11 @@ export function updateTitleLetters(delta) {
 
     if (obj.position.y <= u.targetY) {
       obj.position.y = u.targetY;
-      obj.rotation.set(0, 0, 0);
+      obj.position.z = u.targetZ;
+      obj.position.x = u.targetX;
+      
+      obj.rotation.set(THREE.MathUtils.degToRad(-12), 0, 0);
+      
       u.landed = true;
 
       obj.material.emissiveIntensity = 4.0;
@@ -130,82 +143,143 @@ export function updateTitleLetters(delta) {
   });
 }
 
-// SUPER CLEAN & READABLE PROJECT SCREENS (white text, no color noise)
 export class PersonalProject {
-  constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3()) {
+  constructor({ title, description, tech = [], link = "" }, pos = new THREE.Vector3(), spacingMultiplier = 1.0) {
     this.group = new THREE.Group();
     this.group.position.copy(pos);
+    this.group.scale.set(spacingMultiplier, spacingMultiplier, spacingMultiplier);
 
+    // Uniform large canvas — fits even the longest project perfectly
     const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
+    canvas.width = 1408;
+    canvas.height = 1056;
     const ctx = canvas.getContext('2d');
 
-    // Dark clean background
-    ctx.fillStyle = '#0a1422';
+    // Dark holographic background
+    ctx.fillStyle = 'rgba(8, 15, 35, 0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Cyan border
+    // Subtle scanlines
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.03)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < canvas.height; y += 10) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Neon cyan borders
     ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 14;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    ctx.lineWidth = 20;
+    ctx.strokeRect(45, 45, canvas.width - 90, canvas.height - 90);
+    ctx.lineWidth = 12;
+    ctx.strokeRect(70, 70, canvas.width - 140, canvas.height - 140);
 
-    // Title - bright white
+    // Title — large and bold
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 54px "Arial Black", Arial';
+    ctx.font = 'bold 104px "Arial Black", Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(title, canvas.width / 2, 100);
+    ctx.shadowColor = '#00ffff';
+    ctx.shadowBlur = 30;
+    this._wrapText(ctx, title, canvas.width / 2, 170, 1240, 120);
 
-    // Description - white, wrapped
-    ctx.font = '30px Arial';
-    this._wrapText(ctx, description, canvas.width / 2, 170, 560, 38);
+    // Description
+    ctx.font = '54px Arial';
+    ctx.fillStyle = '#aaffff';
+    ctx.shadowBlur = 18;
+    this._wrapText(ctx, description, canvas.width / 2, 330, 1240, 78);
 
-    // Tech
+    // Tech stack
     if (tech.length) {
-      ctx.font = '26px Arial';
-      ctx.fillText("Tech: " + tech.join(' • '), canvas.width / 2, 380);
+      ctx.font = '50px Arial';
+      ctx.fillStyle = '#00ffff';
+      ctx.shadowBlur = 20;
+      this._wrapText(ctx, "Tech: " + tech.join(' • '), canvas.width / 2, 700, 1240, 68);
     }
 
-    // Link
+    // GitHub link
     if (link) {
-      ctx.fillStyle = '#88ffaa';
-      ctx.font = 'italic 28px Arial';
-      ctx.fillText(link, canvas.width / 2, 430);
+      ctx.fillStyle = '#aaffaa';
+      ctx.font = 'italic 52px Arial';
+      ctx.shadowBlur = 20;
+      this._wrapText(ctx, link, canvas.width / 2, 880, 1240, 68);
     }
+
+    ctx.shadowBlur = 0;
 
     requestAnimationFrame(() => {
       const tex = new THREE.CanvasTexture(canvas);
       tex.needsUpdate = true;
+
+      const screenMaterial = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.98,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+      });
+
       const screen = new THREE.Mesh(
-        new THREE.PlaneGeometry(260, 195),
-        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+        new THREE.PlaneGeometry(570, 427.5),  // Uniform large size
+        screenMaterial
       );
-      screen.position.y = 97.5; // bottom touches ground
+      screen.position.y = 250;
       this.group.add(screen);
+
+      const glowBack = new THREE.Mesh(
+        new THREE.PlaneGeometry(600, 457.5),
+        new THREE.MeshBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: 0.15,
+          blending: THREE.AdditiveBlending
+        })
+      );
+      glowBack.position.y = 250;
+      glowBack.position.z = -12;
+      this.group.add(glowBack);
     });
 
-    // Stand
-    const stand = new THREE.Mesh(
-      new THREE.BoxGeometry(90, 200, 40),
-      new THREE.MeshBasicMaterial({ color: 0x444444 })
+    // Glowing base
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(90, 120, 25, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      })
     );
-    stand.position.y = -80;
-    this.group.add(stand);
+    base.position.y = -10;
+    this.group.add(base);
+
+    // Short center pillar
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 80, 40),
+      new THREE.MeshBasicMaterial({ color: 0x0f1a33 })
+    );
+    pillar.position.y = 30;
+    pillar.position.z = 12;
+    this.group.add(pillar);
   }
 
   _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
     const words = text.split(' ');
     let line = '';
     let cy = y;
+
     for (const word of words) {
-      const test = line + word + ' ';
-      if (ctx.measureText(test).width > maxWidth && line) {
-        ctx.fillText(line, x, cy);
+      const testLine = line + word + ' ';
+      if (ctx.measureText(testLine).width > maxWidth && line !== '') {
+        ctx.fillText(line.trim(), x, cy);
         line = word + ' ';
         cy += lineHeight;
-      } else line = test;
+      } else {
+        line = testLine;
+      }
     }
-    ctx.fillText(line, x, cy);
+    ctx.fillText(line.trim(), x, cy);
   }
 
   addTo(area) {
