@@ -21,7 +21,6 @@ function generateParticleTexture() {
 
 const particleTexture = generateParticleTexture();
 
-// State
 let titleGroup = null;
 let letterParticles = [];
 let allParticles = [];
@@ -30,14 +29,11 @@ let currentLetterIndex = -1;
 let particleIndexInLetter = 0;
 let timeSinceLastParticle = 0;
 let isComplete = false;
-let repelledFlags = null;
 
 const particleSpawnInterval = 0.0008;
 const maxParticles = 10000;
 const raycaster = new THREE.Raycaster();
 const mouse3D = new THREE.Vector3();
-
-// NEW: Vertical plane matching the title's depth (will be set dynamically)
 let titlePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
 const material = new THREE.ShaderMaterial({
@@ -70,20 +66,24 @@ const material = new THREE.ShaderMaterial({
   transparent: true
 });
 
+// Now takes scene AND skillsGroup (to calculate correct world position)
 export function createSkillsTitle(scene, skillsGroup) {
   titleGroup = new THREE.Group();
-  titleGroup.position.copy(skillsGroup.position);
-  titleGroup.position.y = 10;
-  titleGroup.position.z += 180;
-  titleGroup.position.x += 80;
+
+  // Calculate the world position where the title should be
+  // skillsGroup is at (-1100, 100, -800)
+  // Original offset was +80 x, +10 y (but adjusted), +180 z
+  // Final world position: (-1100 + 80, 100 - 100 + 10?, -800 + 180)
+  titleGroup.position.set(-1100 + 30, 50, -800 + 180); // ≈ (-1020, 0, -620)
   titleGroup.rotation.x = -Math.PI / 2;
+
+  // ADD TO SCENE, NOT skillsGroup → completely independent of rotation
   scene.add(titleGroup);
 
-  // === Update the plane to match this group's world Z position ===
+  // Update plane for mouse interaction
   const worldPos = new THREE.Vector3();
   titleGroup.getWorldPosition(worldPos);
   titlePlane.set(new THREE.Vector3(0, 0, 1), -worldPos.z);
-  // Note: plane normal (0,0,1) faces along Z, constant = -Z position
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -122,7 +122,6 @@ export function createSkillsTitle(scene, skillsGroup) {
 
   allParticles = letterParticles.flat();
   velocities = new Float32Array(allParticles.length * 3).fill(0);
-  repelledFlags = new Uint8Array(allParticles.length).fill(0);
 
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(maxParticles * 3);
@@ -166,7 +165,6 @@ export function updateSkillsTitle(camera, delta) {
 
   timeSinceLastParticle += delta;
 
-  // Spawning logic — unchanged
   while (timeSinceLastParticle >= particleSpawnInterval && currentLetterIndex < letterParticles.length) {
     const currentLetter = letterParticles[currentLetterIndex];
     if (particleIndexInLetter < currentLetter.length) {
@@ -187,7 +185,6 @@ export function updateSkillsTitle(camera, delta) {
 
   if (currentLetterIndex >= letterParticles.length && !isComplete) isComplete = true;
 
-  // Physics
   const totalDrawn = letterParticles.slice(0, currentLetterIndex).reduce((a, b) => a + b.length, 0) + particleIndexInLetter;
   const baseSpring = 0.04;
   const damp = 0.82;
@@ -227,9 +224,6 @@ export function updateSkillsTitle(camera, delta) {
         vx += (target.x - ud.positions[i3]) * baseSpring;
         vy += (target.y - ud.positions[i3 + 1]) * baseSpring;
         vz += (target.z - ud.positions[i3 + 2]) * baseSpring;
-        repelledFlags[i] = 0;
-      } else {
-        repelledFlags[i] = 1;
       }
 
       vx *= damp;
@@ -244,7 +238,6 @@ export function updateSkillsTitle(camera, delta) {
       ud.positions[i3 + 1] += vy;
       ud.positions[i3 + 2] += vz;
 
-      // Visuals
       const pulse = isComplete ? 0.94 + Math.sin(time * 4.5 + i * 0.13) * 0.06 : 0.9;
       ud.sizes[i] = (isComplete ? 24 : 35) * pulse;
       ud.alphas[i] = isComplete ? 0.95 : 1.0;

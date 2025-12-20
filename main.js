@@ -103,7 +103,7 @@ addProject({
 //const aboutArea = createAboutArea(scene);
 //const experienceArea = createExperienceArea(scene);
 const skillsArea = createSkillsArea(scene);
-const skillsTitle = createSkillsTitle(scene, skillsArea);
+createSkillsTitle(scene, skillsArea);
 //const contactArea = createContactArea(scene);
 setOrbitControls(controls);
 
