@@ -1,4 +1,4 @@
-// src/skills.js — Enhanced 3D glow for angled viewing (no billboarding + view-based halo)
+// src/skills.js — Orbs now slowly orbit around each other
 import * as THREE from 'three';
 
 // Soft circular particle texture
@@ -25,15 +25,15 @@ const particleTexture = generateParticleTexture();
 let skillsGroup = null;
 
 const skills = [
-  { name: "Python", color: 0x00ff88 },
-  { name: "Swift", color: 0x00ffff },
-  { name: "JavaScript", color: 0xffff00 },
-  { name: "AWS", color: 0xff8800 },
-  { name: "Three.js", color: 0x00aaff },
-  { name: "DevOps", color: 0xff00ff },
-  { name: "Git", color: 0xffffff },
-  { name: "MongoDB", color: 0x00ff00 },
-  { name: "Firebase", color: 0xffaa00 }
+  { name: "Python", color: 0x44aa88 },
+  { name: "Swift", color: 0x88dddd },
+  { name: "JavaScript", color: 0xdddd88 },
+  { name: "AWS", color: 0xccaa77 },
+  { name: "Three.js", color: 0x88aadd },
+  { name: "DevOps", color: 0xccaaff },
+  { name: "Git", color: 0xdddddd },
+  { name: "MongoDB", color: 0x88cc88 },
+  { name: "Firebase", color: 0xddbb88 }
 ];
 
 const cloudParticles = 2500;
@@ -49,12 +49,11 @@ export function createSkillsArea(scene) {
     const angle = (i / skills.length) * Math.PI * 2;
     orbGroup.position.x = Math.cos(angle) * 500;
     orbGroup.position.z = Math.sin(angle) * 500;
-    orbGroup.position.y = Math.sin(i * 0.5) * 200;
+    orbGroup.position.y = Math.sin(i * 0.5) * 200; // Slight vertical variation
 
-    // Tilt toward camera
     orbGroup.rotation.y = THREE.MathUtils.degToRad(20);
 
-    // === Colored particle cloud (NO billboarding — true 3D glow) ===
+    // === Subtle colored background cloud ===
     const cloudPositions = new Float32Array(cloudParticles * 3);
     const cloudSizes = new Float32Array(cloudParticles);
 
@@ -67,7 +66,7 @@ export function createSkillsArea(scene) {
       cloudPositions[j * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       cloudPositions[j * 3 + 2] = r * Math.cos(phi);
 
-      cloudSizes[j] = 8 + Math.random() * 12;
+      cloudSizes[j] = 6 + Math.random() * 8;
     }
 
     const cloudGeometry = new THREE.BufferGeometry();
@@ -77,7 +76,7 @@ export function createSkillsArea(scene) {
     const cloudMaterial = new THREE.ShaderMaterial({
       uniforms: {
         color: { value: new THREE.Color(skill.color) },
-        uOpacity: { value: 0.9 },
+        uOpacity: { value: 0.6 },
         pointTexture: { value: particleTexture }
       },
       vertexShader: `
@@ -105,13 +104,13 @@ export function createSkillsArea(scene) {
     const cloud = new THREE.Points(cloudGeometry, cloudMaterial);
     orbGroup.add(cloud);
 
-    // === White text particles ===
+    // === Text particles ===
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 120px Arial';
+    ctx.font = 'bold 100px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(skill.name, canvas.width / 2, canvas.height / 2);
@@ -119,20 +118,20 @@ export function createSkillsArea(scene) {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     const textPositions = [];
 
-    for (let y = 0; y < canvas.height; y += 2) {
-      for (let x = 0; x < canvas.width; x += 2) {
+    for (let y = 0; y < canvas.height; y += 3) {
+      for (let x = 0; x < canvas.width; x += 3) {
         const i = (y * canvas.width + x) * 4;
         if (data[i + 3] > 128) {
-          const px = (x - canvas.width / 2) * 0.4;
-          const py = -(y - canvas.height / 2) * 0.4;
-          textPositions.push(px, py, Math.random() * 20 - 10);
+          const px = (x - canvas.width / 2) * 0.35;
+          const py = -(y - canvas.height / 2) * 0.35;
+          textPositions.push(px, py, Math.random() * 15 - 7.5);
         }
       }
     }
 
     const textGeometry = new THREE.BufferGeometry();
     const textPosArray = new Float32Array(textPositions);
-    const textSizes = new Float32Array(textPositions.length / 3).fill(10);
+    const textSizes = new Float32Array(textPositions.length / 3).fill(7);
 
     textGeometry.setAttribute('position', new THREE.BufferAttribute(textPosArray, 3));
     textGeometry.setAttribute('size', new THREE.BufferAttribute(textSizes, 1));
@@ -151,32 +150,32 @@ export function createSkillsArea(scene) {
     });
 
     const textParticles = new THREE.Points(textGeometry, textMaterial);
+    textParticles.userData.billboard = true;
     orbGroup.add(textParticles);
 
-    // === View-angle glow halo (makes it pop from tilted angles) ===
+    // === Tight halo ===
     const glowHalo = new THREE.Mesh(
-      new THREE.SphereGeometry(100, 32, 16),
+      new THREE.SphereGeometry(95, 32, 16),
       new THREE.MeshBasicMaterial({
         color: skill.color,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.12,
         blending: THREE.AdditiveBlending,
-        side: THREE.BackSide // Glows outward
+        side: THREE.BackSide
       })
     );
     orbGroup.add(glowHalo);
 
-    // Save references
     orbGroup.userData = {
-      cloud: cloud,
-      textParticles: textParticles,
-      glowHalo: glowHalo,
-      cloudMaterial: cloudMaterial,
-      textMaterial: textMaterial,
-      baseOpacity: 0.9,
-      hoverOpacity: 1.6,
+      cloud,
+      textParticles,
+      glowHalo,
+      cloudMaterial,
+      textMaterial,
+      baseOpacity: 0.6,
+      hoverOpacity: 1.2,
       baseScale: 1.0,
-      hoverScale: 1.4,
+      hoverScale: 1.3,
       timeOffset: Math.random() * Math.PI * 2
     };
 
@@ -191,35 +190,53 @@ export function updateSkills(camera, mouse, raycaster) {
 
   const time = performance.now() * 0.001;
 
+  // === Slow orbital rotation of the entire group ===
+  skillsGroup.rotation.y = time * 0.15; // Adjust 0.15 for speed (smaller = slower)
+
   skillsGroup.children.forEach(orbGroup => {
     const ud = orbGroup.userData;
 
-    // Floating
-    orbGroup.position.y += Math.sin(time * 1.2 + ud.timeOffset) * 0.7;
+    // Subtle individual vertical floating (on top of orbital motion)
+    const floatOffset = Math.sin(time * 1.2 + ud.timeOffset) * 0.7;
+    orbGroup.position.y += floatOffset;
 
-    // Hover
+    // === PREVENT ORBS FROM GOING BELOW GROUND ===
+    // Ground is at y = -80, skillsGroup base at y = 100 → lowest orb should stay comfortably above
+    const minY = 20; // Safe buffer above ground (you can adjust if needed, but 20 is plenty)
+    if (orbGroup.position.y < minY) {
+      orbGroup.position.y = minY;
+    }
+
+    // Billboarding for text
+    if (ud.textParticles.userData.billboard) {
+      ud.textParticles.lookAt(camera.position);
+    }
+
+    // Hover detection
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(orbGroup, true);
     const hovered = intersects.length > 0;
 
+    // Cloud & text opacity
     const targetOpacity = hovered ? ud.hoverOpacity : ud.baseOpacity;
     ud.cloudMaterial.uniforms.uOpacity.value += (targetOpacity - ud.cloudMaterial.uniforms.uOpacity.value) * 0.12;
     ud.textMaterial.uniforms.uOpacity.value += (targetOpacity - ud.textMaterial.uniforms.uOpacity.value) * 0.12;
 
-    // Halo intensity
-    ud.glowHalo.material.opacity = 0.15 + (hovered ? 0.3 : 0);
+    // Halo glow
+    ud.glowHalo.material.opacity = 0.12 + (hovered ? 0.35 : 0);
 
+    // Scale on hover
     const targetScale = hovered ? ud.hoverScale : ud.baseScale;
     orbGroup.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
 
-    // Pulse cloud
+    // Gentle cloud pulse
     const cloudPos = ud.cloud.geometry.attributes.position.array;
-    const pulseStrength = hovered ? 25 : 10;
+    const pulseStrength = hovered ? 18 : 6;
     for (let i = 0; i < cloudPos.length; i += 3) {
       const pulse = Math.sin(time * 8 + i * 0.04) * pulseStrength;
-      cloudPos[i] += pulse * 0.012;
-      cloudPos[i + 1] += pulse * 0.018;
-      cloudPos[i + 2] += pulse * 0.012;
+      cloudPos[i]     += pulse * 0.01;
+      cloudPos[i + 1] += pulse * 0.015;
+      cloudPos[i + 2] += pulse * 0.01;
     }
     ud.cloud.geometry.attributes.position.needsUpdate = true;
   });
