@@ -1,4 +1,4 @@
-// src/skills.js — Fully encapsulating blue grid dome + Skills orbs & title
+// src/skills.js — Blue grid dome + Skills orbs + Ground halo + Upward glowing light beams
 import * as THREE from 'three';
 import { mouse, isMouseOver } from './cursor.js';
 
@@ -34,9 +34,13 @@ const skills = [
 
 const cloudParticles = 2500;
 const domeRadius = 580;
-const innerRadius = 480;           // Orbs constrained within this radius from center
+const innerRadius = 480;
 const orbitalCircleRadius = 380;
 const heightVariance = 180;
+
+// Upward glowing light particles
+const upwardParticleCount = 1200;
+const upwardMaxHeight = domeRadius * 1.9;
 
 const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -55,7 +59,7 @@ export function setOrbitControls(controls) {
   orbitControls = controls;
 }
 
-// === Blue Grid Dome (centered at skillsGroup origin) ===
+// === Blue Grid Dome ===
 function createGridDome() {
   const radius = domeRadius;
   const segmentsLat = 48;
@@ -128,9 +132,114 @@ export function createSkillsArea(scene) {
   skillsGroup.position.set(-1100, 400, -800);
   scene.add(skillsGroup);
 
-  // Dome centered at origin of skillsGroup
+  // Dome
   const dome = createGridDome();
   skillsGroup.add(dome);
+
+  // Ground Halo Ring
+  const groundRing = new THREE.Mesh(
+    new THREE.RingGeometry(domeRadius * 0.95, domeRadius * 1.05, 72, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x00ccff,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  groundRing.rotation.x = -Math.PI / 2;
+  groundRing.position.y = -domeRadius + 5;
+  groundRing.userData = {
+    isGroundRing: true,
+    baseOpacity: 0.45,
+    baseScale: 1.0
+  };
+  skillsGroup.add(groundRing);
+
+  // Inner glow ring
+  const innerGlow = new THREE.Mesh(
+    new THREE.RingGeometry(domeRadius * 0.7, domeRadius * 0.85, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.25,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  innerGlow.rotation.x = -Math.PI / 2;
+  innerGlow.position.y = groundRing.position.y;
+  skillsGroup.add(innerGlow);
+
+  // === Upward glowing light particles ===
+  const upwardPositions = new Float32Array(upwardParticleCount * 3);
+  const upwardSizes = new Float32Array(upwardParticleCount);
+  const upwardAlphas = new Float32Array(upwardParticleCount);
+  const upwardSpeeds = new Float32Array(upwardParticleCount);
+
+  const baseY = groundRing.position.y + 10;
+
+  for (let i = 0; i < upwardParticleCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = domeRadius * (0.7 + Math.random() * 0.35);
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+
+    upwardPositions[i * 3] = x;
+    upwardPositions[i * 3 + 1] = baseY + Math.random() * 50;
+    upwardPositions[i * 3 + 2] = z;
+
+    upwardSizes[i] = 8 + Math.random() * 14;
+    upwardAlphas[i] = Math.random();
+    upwardSpeeds[i] = 25 + Math.random() * 40;
+  }
+
+  const upwardGeometry = new THREE.BufferGeometry();
+  upwardGeometry.setAttribute('position', new THREE.BufferAttribute(upwardPositions, 3));
+  upwardGeometry.setAttribute('size', new THREE.BufferAttribute(upwardSizes, 1));
+  upwardGeometry.setAttribute('alpha', new THREE.BufferAttribute(upwardAlphas, 1));
+
+  const upwardMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      color: { value: new THREE.Color(0x80ff80) },
+      pointTexture: { value: particleTexture }
+    },
+    vertexShader: `
+      attribute float size;
+      attribute float alpha;
+      varying float vAlpha;
+      void main() {
+        vAlpha = alpha;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (300.0 / -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 color;
+      uniform sampler2D pointTexture;
+      varying float vAlpha;
+      void main() {
+        vec4 texColor = texture2D(pointTexture, gl_PointCoord);
+        gl_FragColor = vec4(color, texColor.a * vAlpha);
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true
+  });
+
+  const upwardLights = new THREE.Points(upwardGeometry, upwardMaterial);
+  upwardLights.userData = {
+    isUpwardLights: true,
+    positions: upwardPositions,
+    alphas: upwardAlphas,
+    speeds: upwardSpeeds,
+    baseY: baseY
+  };
+  skillsGroup.add(upwardLights);
 
   skills.forEach((skill, i) => {
     const orbGroup = new THREE.Group();
@@ -190,7 +299,7 @@ export function createSkillsArea(scene) {
     const cloud = new THREE.Points(cloudGeometry, cloudMaterial);
     orbGroup.add(cloud);
 
-    // === Text Particles (skill name) ===
+    // === Text Particles ===
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
@@ -275,7 +384,6 @@ export function createSkillsArea(scene) {
   return skillsGroup;
 }
 
-// Drag handlers (unchanged)
 function onPointerDown(event) {
   if (!isMouseOver || !skillsGroup || !orbitControls || event.button !== 0) return;
 
@@ -358,11 +466,50 @@ export function updateSkills(camera) {
   }
 
   skillsGroup.children.forEach(child => {
-    // Dome animation
+    // Dome pulse
     if (child.userData.isDome) {
       child.lookAt(camera.position);
       const pulse = 0.4 + Math.sin(time * 2) * 0.15;
       child.userData.lineMaterial.opacity = pulse;
+    }
+
+    // Ground ring pulse
+    if (child.userData.isGroundRing) {
+      const pulse = 0.35 + Math.sin(time * 1.5) * 0.2;
+      child.material.opacity = child.userData.baseOpacity * pulse;
+      const scalePulse = 0.98 + Math.sin(time * 1.7 + 1) * 0.04;
+      child.scale.setScalar(child.userData.baseScale * scalePulse);
+    }
+
+    // Upward light particles animation
+    if (child.userData.isUpwardLights) {
+      const ud = child.userData;
+      const pos = ud.positions;
+      const alphas = ud.alphas;
+      const speeds = ud.speeds;
+      const deltaTime = 0.016;
+
+      const intensityPulse = 0.7 + Math.sin(time * 1.8) * 0.3;
+
+      for (let i = 0; i < upwardParticleCount; i++) {
+        const idx = i * 3;
+        pos[idx + 1] += speeds[i] * deltaTime;
+
+        if (pos[idx + 1] > ud.baseY + upwardMaxHeight) {
+          const angle = Math.random() * Math.PI * 2;
+          const radius = domeRadius * (0.7 + Math.random() * 0.35);
+          pos[idx] = Math.cos(angle) * radius;
+          pos[idx + 2] = Math.sin(angle) * radius;
+          pos[idx + 1] = ud.baseY + Math.random() * 40;
+          alphas[i] = 0.0;
+        }
+
+        const heightNorm = (pos[idx + 1] - ud.baseY) / upwardMaxHeight;
+        alphas[i] = Math.min(1.0, Math.sin(heightNorm * Math.PI)) * intensityPulse;
+      }
+
+      child.geometry.attributes.position.needsUpdate = true;
+      child.geometry.attributes.alpha.needsUpdate = true;
     }
 
     // Orb animation
@@ -380,25 +527,21 @@ export function updateSkills(camera) {
 
         currentPos.add(vel.clone().multiplyScalar(0.016));
 
-        // === Constrain inside dome ===
         if (currentPos.length() > innerRadius) {
           currentPos.normalize().multiplyScalar(innerRadius);
-          vel.multiplyScalar(0.5); // dampen on boundary hit
+          vel.multiplyScalar(0.5);
         }
 
         orbGroup.position.copy(currentPos);
 
-        // Gentle float
         const floatOffset = Math.sin(time * 1.2 + ud.timeOffset) * 0.7;
         orbGroup.position.y += floatOffset;
       }
 
-      // Billboard text
       if (ud.textParticles.userData.billboard) {
         ud.textParticles.lookAt(camera.position);
       }
 
-      // Hover detection
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObject(orbGroup, true);
       const hovered = intersects.length > 0 && grabbedOrb !== orbGroup;
@@ -411,7 +554,6 @@ export function updateSkills(camera) {
       const targetScale = hovered ? ud.hoverScale : ud.baseScale;
       orbGroup.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
 
-      // Cloud pulse & mouse repulsion (unchanged)
       const cloudPos = ud.cloud.geometry.attributes.position.array;
       const pulseStrength = hovered ? 18 : 6;
       for (let i = 0; i < cloudPos.length; i += 3) {
@@ -474,13 +616,12 @@ export function updateSkills(camera) {
 
       ud.cloud.geometry.attributes.position.needsUpdate = true;
 
-      // Attract orb to cursor when close
       if (cursorInWorld && isMouseOver && grabbedOrb !== orbGroup) {
         orbGroup.updateMatrixWorld();
         const orbWorldPos = new THREE.Vector3();
         orbGroup.getWorldPosition(orbWorldPos);
         const toCursor = orbWorldPos.clone().sub(cursorInWorld);
-        const distance = toCursor.length(); 
+        const distance = toCursor.length();
         if (distance < 600 && distance > 50) {
           const force = (1 - distance / 600) * 90;
           toCursor.normalize();
