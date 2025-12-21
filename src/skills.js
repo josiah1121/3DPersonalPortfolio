@@ -469,8 +469,6 @@ export function updateSkills(camera) {
     // Dome pulse
     if (child.userData.isDome) {
       child.lookAt(camera.position);
-      const pulse = 0.4 + Math.sin(time * 2) * 0.15;
-      child.userData.lineMaterial.opacity = pulse;
     }
 
     // Ground ring pulse

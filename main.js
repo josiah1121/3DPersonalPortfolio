@@ -1,15 +1,19 @@
 // main.js — Very tight and close arc around PERSONAL PROJECTS title
 import * as THREE from 'three';
+import { mouse as cursorMouse } from './src/cursor.js';
 import { initScene } from './src/scene.js';
 import { initShootingStars, updateShootingStars } from './src/stars.js';
 import Particles from './src/particles.js';
+import { createGlowText, updateGlowText } from './src/glowText.js';
 import { setupCursor } from './src/cursor.js';
 import { createPlayer } from './src/player.js';
 import { initDust, updateDust } from './src/dust.js';
 import { createAboutArea, updateAboutLetters } from './src/about.js';
-import { createExperienceArea } from './src/experience.js';
+import { createExperienceArea, updateExperience } from './src/experience.js';
 import { createSkillsArea, updateSkills, setOrbitControls } from './src/skills.js';
 import { createSkillsTitle, updateSkillsTitle } from './src/skillsTitle.js';
+import { createExperienceTitle, updateExperienceTitle } from './src/experienceTitle.js';
+import { createNeonTunnel } from './src/neonTunnel.js';
 import { createContactArea } from './src/contact.js';
 
 import { 
@@ -30,6 +34,7 @@ createParticles(scene, "Josiah Clark", {
   onComplete: () => {
     console.log("Particle text fully formed!");
     cursor.activate();
+    setTimeout(() => createGlowText(scene), 500);
   }
 });
 
@@ -100,12 +105,15 @@ addProject({
   link: "github.com/josiah1121/arduino-fan"
 }, 4);
 
-//const aboutArea = createAboutArea(scene);
-//const experienceArea = createExperienceArea(scene);
+
+const { tunnelGroup, updateNeonTunnel } = createNeonTunnel(scene);
 const skillsArea = createSkillsArea(scene);
 createSkillsTitle(scene, skillsArea);
 //const contactArea = createContactArea(scene);
 setOrbitControls(controls);
+//const aboutArea = createAboutArea(scene);
+const experienceArea = createExperienceArea(scene);
+createExperienceTitle(scene);
 
 // ————————————————————————
 // ANIMATION LOOP
@@ -119,6 +127,9 @@ function animate() {
 
   controls.update();
   updateParticles(camera);
+  updateGlowText(camera);
+  const elapsed = clock.getElapsedTime();
+  updateNeonTunnel(elapsed);
   player.update(delta);
   cursor.update();
   updateDust();
@@ -132,16 +143,10 @@ function animate() {
   renderer.render(scene, camera);
 
   //updateAboutLetters(delta);
-  // Add these after your other const declarations
   const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2(); // We'll sync this with cursor's mouse
-
-  // Listen for mouse move to keep our local mouse in sync
-  window.addEventListener('mousemove', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  });
-  updateSkills(camera, mouse, raycaster);
+  updateExperienceTitle(camera);
+  updateExperience(camera, cursorMouse);
+  updateSkills(camera, cursorMouse, raycaster);
   updateSkillsTitle(camera, delta);
 }
 
