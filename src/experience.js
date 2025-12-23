@@ -1,4 +1,4 @@
-// src/experience.js — Aggressive Jelly with Surface Tension logic
+// src/experience.js — Aggressive Jelly with Deep Yellow Lightning
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -6,9 +6,6 @@ let billboardOrbs = [];
 let raycaster = new THREE.Raycaster();
 let currentDimLevel = 1.0;
 let sceneRef = null;
-let projectsBillboards = [];
-let skillsGroupRef = null;
-let skillsTitleGroupRef = null;
 
 export function createExperienceArea(scene) {
   sceneRef = scene;
@@ -63,8 +60,8 @@ export function createExperienceArea(scene) {
     );
     orbGroup.add(hitbox);
 
-    // === PARTICLE ORB ===
-    const particleCount = 1500; // Even denser for "liquid" look
+    // === 1. PARTICLE ORB (Outer Jelly) ===
+    const particleCount = 1500;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const targets = new Float32Array(particleCount * 3);
@@ -84,7 +81,6 @@ export function createExperienceArea(scene) {
       targets[j*3] = Math.cos(angle) * 280; 
       targets[j*3+1] = Math.sin(angle) * 280;
       targets[j*3+2] = (Math.random() - 0.5) * 50;
-
       phases[j] = Math.random() * Math.PI * 2;
     }
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -102,43 +98,28 @@ export function createExperienceArea(scene) {
         attribute float phase;
         uniform float time;
         uniform float flow;
-        
         void main() {
           vec3 idlePos = position;
           float pStr = 1.0 - flow;
-
           if (pStr > 0.01) {
             vec3 norm = normalize(position);
-            
-            // 1. Aggressive Secondary Motion
-            // Multi-layered waves for "thick" liquid feel
             float waveA = sin(time * 2.0 + (position.y * 0.03)) * 15.0;
             float waveB = cos(time * 3.5 + (position.x * 0.02)) * 8.0;
-            
-            // 2. Edge Cohesion Logic (Surface Tension)
-            // Points are pulled toward wave peaks more aggressively
             float tension = pow(abs(sin(time * 1.5 + norm.y * 5.0)), 3.0);
             idlePos += norm * (waveA + waveB) * tension * pStr;
-
-            // 3. Elastic "Oval" Deformation
             float stretchX = 1.0 + sin(time * 2.5) * 0.2 * pStr;
             float stretchY = 1.0 + cos(time * 2.0) * 0.15 * pStr;
             idlePos.x *= stretchX;
             idlePos.y *= stretchY;
-
-            // 4. Liquid Drift
             idlePos.xy += vec2(sin(time + phase), cos(time + phase)) * 6.0 * pStr;
           }
-
           vec3 pos = mix(idlePos, targetPosition, flow);
-          
           if(flow > 0.1) {
              float r = length(pos.xy);
-             float ang = atan(pos.y, pos.x) + time * 2.2; // Faster vortex
+             float ang = atan(pos.y, pos.x) + time * 2.2;
              pos.x = cos(ang) * r;
              pos.y = sin(ang) * r;
           }
-          
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           gl_PointSize = 8.5 * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
@@ -149,7 +130,6 @@ export function createExperienceArea(scene) {
         void main() {
           float dist = length(gl_PointCoord - vec2(0.5));
           if (dist > 0.5) discard;
-          // More opaque particles for a "thicker" material look
           float alpha = smoothstep(0.5, 0.05, dist);
           gl_FragColor = vec4(color, alpha * 0.95);
         }
@@ -162,25 +142,58 @@ export function createExperienceArea(scene) {
     const points = new THREE.Points(geometry, partMat);
     orbGroup.add(points);
 
+    // === 2. STATIC THICK PARTICLE LIGHTNING BOLT (Deep Yellow) ===
+    const boltCount = 1800; // Even denser for saturated color
+    const boltGeo = new THREE.BufferGeometry();
+    const boltPositions = new Float32Array(boltCount * 3);
+    
+    const boltPath = [
+      new THREE.Vector3(18, 50, 0),
+      new THREE.Vector3(-18, 5, 0),
+      new THREE.Vector3(12, 5, 0),
+      new THREE.Vector3(-12, -50, 0)
+    ];
+
+    for (let j = 0; j < boltCount; j++) {
+      const segment = Math.floor(Math.random() * (boltPath.length - 1));
+      const t = Math.random();
+      
+      const jitterX = 10.0; 
+      const jitterY = 3.0;
+      const jitterZ = 5.0;
+
+      const v = new THREE.Vector3().lerpVectors(boltPath[segment], boltPath[segment+1], t);
+      boltPositions[j*3] = v.x + (Math.random() - 0.5) * jitterX;
+      boltPositions[j*3+1] = v.y + (Math.random() - 0.5) * jitterY;
+      boltPositions[j*3+2] = v.z + (Math.random() - 0.5) * jitterZ;
+    }
+    boltGeo.setAttribute('position', new THREE.BufferAttribute(boltPositions, 3));
+    
+    const boltMat = new THREE.PointsMaterial({
+      color: 0xffd700, // Gold/Saturated Yellow
+      size: 5.0,
+      transparent: true,
+      opacity: 1.0,     // Full opacity for saturation
+      blending: THREE.NormalBlending, // Changed from Additive to prevent whitening
+      depthWrite: false
+    });
+    const boltParticles = new THREE.Points(boltGeo, boltMat);
+    orbGroup.add(boltParticles);
+
+    // === TEXT CANVAS SYSTEM ===
     const canvas = document.createElement('canvas');
     canvas.width = 1200; 
     canvas.height = 512;
     const tex = new THREE.CanvasTexture(canvas);
-    
     const textMat = new THREE.MeshBasicMaterial({ 
-      map: tex, 
-      transparent: true, 
-      opacity: 0,
-      depthTest: false,
-      depthWrite: false
+      map: tex, transparent: true, opacity: 0, depthWrite: false
     });
-    
     const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(600, 256), textMat);
     textMesh.position.set(0, 0, 15);
-    textMesh.renderOrder = 999; 
     orbGroup.add(textMesh);
 
     orbGroup.userData.particleOrb = points;
+    orbGroup.userData.lightning = boltParticles;
     orbGroup.userData.textMesh = textMesh;
     orbGroup.userData.canvas = canvas;
     orbGroup.userData.ctx = canvas.getContext('2d');
@@ -209,12 +222,19 @@ export function updateExperience(camera, mouseVec) {
     const isHovered = (orb === hoveredOrb);
     const job = orb.userData.job;
     const pMat = orb.userData.particleOrb.material;
+    const lMat = orb.userData.lightning.material;
     const tMat = orb.userData.textMesh.material;
     const ctx = orb.userData.ctx;
     const canvas = orb.userData.canvas;
 
     pMat.uniforms.time.value = performance.now() * 0.001;
     pMat.uniforms.flow.value += ((isHovered ? 1.0 : 0.0) - pMat.uniforms.flow.value) * 0.12;
+    
+    // Bolt remains solid yellow
+    const boltTargetOpacity = isHovered ? 0.0 : 1.0;
+    lMat.opacity += (boltTargetOpacity - lMat.opacity) * 0.15;
+    orb.userData.lightning.scale.set(1, 1, 1); 
+
     tMat.opacity += ((isHovered ? 1.0 : 0.0) - tMat.opacity) * 0.15;
 
     if (tMat.opacity > 0.01) {
@@ -242,7 +262,6 @@ export function updateExperience(camera, mouseVec) {
       ctx.fillStyle = '#e0e0e0';
       ctx.font = '64px Arial';
       ctx.fillText(job.years, canvas.width / 2, 330);
-
       tMat.map.needsUpdate = true;
     }
 
