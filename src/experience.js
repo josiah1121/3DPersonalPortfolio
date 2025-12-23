@@ -1,4 +1,4 @@
-// src/experience.js — Aggressive Jelly with Deep Yellow Lightning
+// src/experience.js — High-Vibrancy Experience Orbs
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -41,18 +41,20 @@ export function createExperienceArea(scene) {
     const lineEnd = new THREE.Vector3(direction * 650, yPos, 0);
 
     const lineCurve = new THREE.LineCurve3(new THREE.Vector3(0, yPos, 0), lineEnd);
-    const lineTube = new THREE.TubeGeometry(lineCurve, 32, 8, 8, false);
+    const lineTubeGeo = new THREE.TubeGeometry(lineCurve, 32, 8, 8, false);
     const lineMat = new THREE.MeshBasicMaterial({
       color: job.color,
       transparent: true,
       opacity: 0.7,
       blending: THREE.AdditiveBlending
     });
-    expGroup.add(new THREE.Mesh(lineTube, lineMat));
+    const lineMesh = new THREE.Mesh(lineTubeGeo, lineMat);
+    expGroup.add(lineMesh);
 
     const orbGroup = new THREE.Group();
     orbGroup.position.copy(lineEnd);
     orbGroup.userData.job = job;
+    orbGroup.userData.connectorLine = lineMesh;
 
     const hitbox = new THREE.Mesh(
       new THREE.CircleGeometry(450, 16),
@@ -142,11 +144,10 @@ export function createExperienceArea(scene) {
     const points = new THREE.Points(geometry, partMat);
     orbGroup.add(points);
 
-    // === 2. STATIC THICK PARTICLE LIGHTNING BOLT (Deep Yellow) ===
-    const boltCount = 1800; // Even denser for saturated color
+    // === 2. LIGHTNING BOLT ===
+    const boltCount = 1800; 
     const boltGeo = new THREE.BufferGeometry();
     const boltPositions = new Float32Array(boltCount * 3);
-    
     const boltPath = [
       new THREE.Vector3(18, 50, 0),
       new THREE.Vector3(-18, 5, 0),
@@ -157,39 +158,47 @@ export function createExperienceArea(scene) {
     for (let j = 0; j < boltCount; j++) {
       const segment = Math.floor(Math.random() * (boltPath.length - 1));
       const t = Math.random();
-      
-      const jitterX = 10.0; 
-      const jitterY = 3.0;
-      const jitterZ = 5.0;
-
       const v = new THREE.Vector3().lerpVectors(boltPath[segment], boltPath[segment+1], t);
-      boltPositions[j*3] = v.x + (Math.random() - 0.5) * jitterX;
-      boltPositions[j*3+1] = v.y + (Math.random() - 0.5) * jitterY;
-      boltPositions[j*3+2] = v.z + (Math.random() - 0.5) * jitterZ;
+      boltPositions[j*3] = v.x + (Math.random() - 0.5) * 10.0;
+      boltPositions[j*3+1] = v.y + (Math.random() - 0.5) * 3.0;
+      boltPositions[j*3+2] = v.z + (Math.random() - 0.5) * 5.0;
     }
     boltGeo.setAttribute('position', new THREE.BufferAttribute(boltPositions, 3));
     
     const boltMat = new THREE.PointsMaterial({
-      color: 0xffd700, // Gold/Saturated Yellow
+      color: 0xffd700, 
       size: 5.0,
       transparent: true,
-      opacity: 1.0,     // Full opacity for saturation
-      blending: THREE.NormalBlending, // Changed from Additive to prevent whitening
+      opacity: 1.0,     
+      blending: THREE.NormalBlending, 
       depthWrite: false
     });
     const boltParticles = new THREE.Points(boltGeo, boltMat);
     orbGroup.add(boltParticles);
 
-    // === TEXT CANVAS SYSTEM ===
+    // === 3. TEXT CANVAS (VIBRANCY FIX) ===
     const canvas = document.createElement('canvas');
-    canvas.width = 1200; 
-    canvas.height = 512;
+    canvas.width = 1024; 
+    canvas.height = 1024;
+    
     const tex = new THREE.CanvasTexture(canvas);
+    // FIX: Set Color Space for vibrancy in modern Three.js
+    tex.colorSpace = THREE.SRGBColorSpace; 
+    
     const textMat = new THREE.MeshBasicMaterial({ 
-      map: tex, transparent: true, opacity: 0, depthWrite: false
+      map: tex, 
+      transparent: true, 
+      opacity: 0, 
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      color: 0xffffff // Force material to pure white
     });
-    const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(600, 256), textMat);
-    textMesh.position.set(0, 0, 15);
+    
+    const textMesh = new THREE.Mesh(new THREE.CircleGeometry(310, 32), textMat);
+    textMesh.position.set(0, 0, 20); // Moved slightly forward
+    
+    // Tag this mesh so the global dimming logic ignores it
+    textMesh.userData.isTextOverlay = true; 
     orbGroup.add(textMesh);
 
     orbGroup.userData.particleOrb = points;
@@ -224,44 +233,47 @@ export function updateExperience(camera, mouseVec) {
     const pMat = orb.userData.particleOrb.material;
     const lMat = orb.userData.lightning.material;
     const tMat = orb.userData.textMesh.material;
+    const cMat = orb.userData.connectorLine.material;
     const ctx = orb.userData.ctx;
     const canvas = orb.userData.canvas;
 
     pMat.uniforms.time.value = performance.now() * 0.001;
     pMat.uniforms.flow.value += ((isHovered ? 1.0 : 0.0) - pMat.uniforms.flow.value) * 0.12;
     
-    // Bolt remains solid yellow
-    const boltTargetOpacity = isHovered ? 0.0 : 1.0;
-    lMat.opacity += (boltTargetOpacity - lMat.opacity) * 0.15;
-    orb.userData.lightning.scale.set(1, 1, 1); 
-
+    lMat.opacity += ((isHovered ? 0.0 : 1.0) - lMat.opacity) * 0.15;
+    cMat.opacity += ((isHovered ? 0.0 : 0.7) - cMat.opacity) * 0.15;
     tMat.opacity += ((isHovered ? 1.0 : 0.0) - tMat.opacity) * 0.15;
 
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let fontSize = 100;
-      ctx.font = `bold ${fontSize}px Arial`;
-      const textWidth = ctx.measureText(job.title).width;
-      const maxWidth = canvas.width - 120; 
-      if (textWidth > maxWidth) fontSize = Math.floor(fontSize * (maxWidth / textWidth));
-
-      ctx.fillStyle = 'rgba(0, 2, 12, 0.95)'; 
+      
+      // Slightly deeper background for more contrast
+      ctx.fillStyle = 'rgba(0, 2, 15, 0.99)'; 
       ctx.beginPath();
-      ctx.roundRect(40, 80, canvas.width - 80, 350, 60);
+      ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      
+      // Increased glow intensity
       ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${fontSize}px Arial`; 
-      ctx.fillText(job.title, canvas.width / 2, 210);
+      ctx.shadowBlur = 40; 
+      ctx.fillStyle = '#ffffff'; 
 
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#e0e0e0';
-      ctx.font = '64px Arial';
-      ctx.fillText(job.years, canvas.width / 2, 330);
+      let fontSize = 120;
+      ctx.font = `bold ${fontSize}px Arial`;
+      const textWidth = ctx.measureText(job.title).width;
+      const maxWidth = canvas.width * 0.9; 
+      if (textWidth > maxWidth) fontSize = Math.floor(fontSize * (maxWidth / textWidth));
+      
+      ctx.font = `bold ${fontSize}px Arial`; 
+      ctx.fillText(job.title, canvas.width / 2, canvas.height / 2 - 45);
+
+      ctx.shadowBlur = 15;
+      ctx.font = '72px Arial';
+      ctx.fillText(job.years, canvas.width / 2, canvas.height / 2 + 85);
+      
       tMat.map.needsUpdate = true;
     }
 
@@ -271,9 +283,10 @@ export function updateExperience(camera, mouseVec) {
   });
 
   if (sceneRef) {
-    currentDimLevel += ((hoveredOrb ? 0.05 : 1.0) - currentDimLevel) * 0.1;
+    currentDimLevel += ((hoveredOrb ? 0.1 : 1.0) - currentDimLevel) * 0.1;
     sceneRef.traverse(child => {
-      if (child.isMesh && !expGroup.getObjectById(child.id)) {
+      // FIX: Ensure the text mesh doesn't get dimmed by the global traverse
+      if (child.isMesh && !expGroup.getObjectById(child.id) && !child.userData.isTextOverlay) {
         if (!child.userData.baseOp) child.userData.baseOp = child.material.opacity || 1;
         child.material.transparent = true;
         child.material.opacity = child.userData.baseOp * currentDimLevel;
