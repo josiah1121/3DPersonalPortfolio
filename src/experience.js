@@ -1,4 +1,4 @@
-// src/experience.js — High-Vibrancy Experience Orbs
+// src/experience.js — Precision Hitboxes & High-Vibrancy
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -56,13 +56,15 @@ export function createExperienceArea(scene) {
     orbGroup.userData.job = job;
     orbGroup.userData.connectorLine = lineMesh;
 
+    // === PRECISION HITBOX ===
+    // Reduced from 450 to 150 to match the particle cloud bounds
     const hitbox = new THREE.Mesh(
-      new THREE.CircleGeometry(450, 16),
+      new THREE.CircleGeometry(150, 32), 
       new THREE.MeshBasicMaterial({ visible: false })
     );
     orbGroup.add(hitbox);
 
-    // === 1. PARTICLE ORB (Outer Jelly) ===
+    // === 1. PARTICLE ORB ===
     const particleCount = 1500;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -176,13 +178,11 @@ export function createExperienceArea(scene) {
     const boltParticles = new THREE.Points(boltGeo, boltMat);
     orbGroup.add(boltParticles);
 
-    // === 3. TEXT CANVAS (VIBRANCY FIX) ===
+    // === 3. TEXT CANVAS ===
     const canvas = document.createElement('canvas');
     canvas.width = 1024; 
     canvas.height = 1024;
-    
     const tex = new THREE.CanvasTexture(canvas);
-    // FIX: Set Color Space for vibrancy in modern Three.js
     tex.colorSpace = THREE.SRGBColorSpace; 
     
     const textMat = new THREE.MeshBasicMaterial({ 
@@ -191,13 +191,11 @@ export function createExperienceArea(scene) {
       opacity: 0, 
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      color: 0xffffff // Force material to pure white
+      color: 0xffffff
     });
     
     const textMesh = new THREE.Mesh(new THREE.CircleGeometry(310, 32), textMat);
-    textMesh.position.set(0, 0, 20); // Moved slightly forward
-    
-    // Tag this mesh so the global dimming logic ignores it
+    textMesh.position.set(0, 0, 20); 
     textMesh.userData.isTextOverlay = true; 
     orbGroup.add(textMesh);
 
@@ -219,6 +217,7 @@ export function updateExperience(camera, mouseVec) {
 
   if (mouseVec) {
     raycaster.setFromCamera(mouseVec, camera);
+    // Raycast against the group's children (the hitbox)
     const intersects = raycaster.intersectObjects(billboardOrbs, true);
     if (intersects.length > 0) {
       let obj = intersects[0].object;
@@ -246,8 +245,6 @@ export function updateExperience(camera, mouseVec) {
 
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Slightly deeper background for more contrast
       ctx.fillStyle = 'rgba(0, 2, 15, 0.99)'; 
       ctx.beginPath();
       ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
@@ -255,8 +252,6 @@ export function updateExperience(camera, mouseVec) {
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      
-      // Increased glow intensity
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 40; 
       ctx.fillStyle = '#ffffff'; 
@@ -285,7 +280,6 @@ export function updateExperience(camera, mouseVec) {
   if (sceneRef) {
     currentDimLevel += ((hoveredOrb ? 0.1 : 1.0) - currentDimLevel) * 0.1;
     sceneRef.traverse(child => {
-      // FIX: Ensure the text mesh doesn't get dimmed by the global traverse
       if (child.isMesh && !expGroup.getObjectById(child.id) && !child.userData.isTextOverlay) {
         if (!child.userData.baseOp) child.userData.baseOp = child.material.opacity || 1;
         child.material.transparent = true;
