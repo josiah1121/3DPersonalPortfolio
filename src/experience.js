@@ -1,14 +1,24 @@
 // src/experience.js — Precision Hitboxes & High-Vibrancy
 import * as THREE from 'three';
+import { createInfoCard } from './components/infoCard.js';
 
 let expGroup = null;
 let billboardOrbs = [];
 let raycaster = new THREE.Raycaster();
 let currentDimLevel = 1.0;
 let sceneRef = null;
+let infoCard = null;
 
-export function createExperienceArea(scene) {
+// Click handling state
+let isMouseDown = false;
+let mouseDownPos = new THREE.Vector2();
+
+export function createExperienceArea(scene, camera) {
   sceneRef = scene;
+
+  // Create the info card (pass scene and camera)
+  infoCard = createInfoCard(scene, camera);
+
   expGroup = new THREE.Group();
   billboardOrbs = [];
 
@@ -16,8 +26,19 @@ export function createExperienceArea(scene) {
   scene.add(expGroup);
 
   const jobs = [
-    { title: "Collins Aerospace", years: "2025 – Present", color: 0x0088ff },
-    { title: "Raytheon Technologies", years: "2023 – 2025", color: 0x0088ff }
+    { 
+      title: "Collins Aerospace", 
+      years: "2025 – Present", 
+      color: 0x0088ff,
+      description: "Leading advanced avionics software development and platform engineering for next-generation aerospace systems. Driving DevOps transformation by architecting automated CI/CD pipelines for mission-critical embedded code, ensuring secure, high-reliability deployments through Infrastructure as Code."
+    },
+    { 
+      title: "Raytheon Technologies", 
+      years: "2023 – 2025", 
+      color: 0x0088ff,
+      description: "Engineered mission-critical Hardware-in-the-Loop (HIL) simulation environments to validate missile flight software and electrical components. Developed sophisticated software interfaces to bridge real-time simulations with physical hardware manifolds, allowing for high-fidelity testing of electrical systems and flight logic against simulated high-dynamic environments."
+    }
+    // Add more jobs with .description as needed
   ];
 
   const timelineHeight = 800;
@@ -56,37 +77,37 @@ export function createExperienceArea(scene) {
     orbGroup.userData.job = job;
     orbGroup.userData.connectorLine = lineMesh;
 
-    // === PRECISION HITBOX ===
-    // Reduced from 450 to 150 to match the particle cloud bounds
+    // Precision hitbox (invisible)
     const hitbox = new THREE.Mesh(
-      new THREE.CircleGeometry(150, 32), 
+      new THREE.CircleGeometry(150, 32),
       new THREE.MeshBasicMaterial({ visible: false })
     );
     orbGroup.add(hitbox);
 
-    // === 1. PARTICLE ORB ===
+    // === PARTICLE ORB ===
     const particleCount = 1500;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const targets = new Float32Array(particleCount * 3);
-    const phases = new Float32Array(particleCount); 
-    
+    const phases = new Float32Array(particleCount);
+
     for (let j = 0; j < particleCount; j++) {
       const u = Math.random();
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
-      
+
       positions[j*3] = 120 * Math.sin(phi) * Math.cos(theta);
       positions[j*3+1] = 120 * Math.sin(phi) * Math.sin(theta);
       positions[j*3+2] = 120 * Math.cos(phi);
 
-      const angle = 0.5 + Math.random() * 5.3; 
-      targets[j*3] = Math.cos(angle) * 280; 
+      const angle = 0.5 + Math.random() * 5.3;
+      targets[j*3] = Math.cos(angle) * 280;
       targets[j*3+1] = Math.sin(angle) * 280;
       targets[j*3+2] = (Math.random() - 0.5) * 50;
       phases[j] = Math.random() * Math.PI * 2;
     }
+
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('targetPosition', new THREE.BufferAttribute(targets, 3));
     geometry.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
@@ -146,8 +167,8 @@ export function createExperienceArea(scene) {
     const points = new THREE.Points(geometry, partMat);
     orbGroup.add(points);
 
-    // === 2. LIGHTNING BOLT ===
-    const boltCount = 1800; 
+    // === LIGHTNING BOLT ===
+    const boltCount = 1800;
     const boltGeo = new THREE.BufferGeometry();
     const boltPositions = new Float32Array(boltCount * 3);
     const boltPath = [
@@ -166,37 +187,37 @@ export function createExperienceArea(scene) {
       boltPositions[j*3+2] = v.z + (Math.random() - 0.5) * 5.0;
     }
     boltGeo.setAttribute('position', new THREE.BufferAttribute(boltPositions, 3));
-    
+
     const boltMat = new THREE.PointsMaterial({
-      color: 0xffd700, 
+      color: 0xffd700,
       size: 5.0,
       transparent: true,
-      opacity: 1.0,     
-      blending: THREE.NormalBlending, 
+      opacity: 1.0,
+      blending: THREE.NormalBlending,
       depthWrite: false
     });
     const boltParticles = new THREE.Points(boltGeo, boltMat);
     orbGroup.add(boltParticles);
 
-    // === 3. TEXT CANVAS ===
+    // === TEXT OVERLAY (title/years on hover) ===
     const canvas = document.createElement('canvas');
-    canvas.width = 1024; 
+    canvas.width = 1024;
     canvas.height = 1024;
     const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace; 
-    
-    const textMat = new THREE.MeshBasicMaterial({ 
-      map: tex, 
-      transparent: true, 
-      opacity: 0, 
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const textMat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       color: 0xffffff
     });
-    
+
     const textMesh = new THREE.Mesh(new THREE.CircleGeometry(310, 32), textMat);
-    textMesh.position.set(0, 0, 20); 
-    textMesh.userData.isTextOverlay = true; 
+    textMesh.position.set(0, 0, 20);
+    textMesh.userData.isTextOverlay = true;
     orbGroup.add(textMesh);
 
     orbGroup.userData.particleOrb = points;
@@ -212,12 +233,47 @@ export function createExperienceArea(scene) {
   return expGroup;
 }
 
+// Click handlers (call these from your main app)
+export function handlePointerDown(event, camera) {
+  isMouseDown = true;
+  mouseDownPos.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseDownPos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+export function handlePointerUp(event, camera) {
+  if (!isMouseDown) return;
+  isMouseDown = false;
+
+  const mouseUpPos = new THREE.Vector2(
+    (event.clientX / window.innerWidth) * 2 - 1,
+    -(event.clientY / window.innerHeight) * 2 + 1
+  );
+
+  // Simple click detection
+  if (mouseDownPos.distanceTo(mouseUpPos) < 0.02) {
+    raycaster.setFromCamera(mouseUpPos, camera);
+    const intersects = raycaster.intersectObjects(billboardOrbs, true);
+
+    if (intersects.length > 0) {
+      let obj = intersects[0].object;
+      while (obj && !obj.userData.job) obj = obj.parent;
+      if (obj && obj.userData.job) {
+        // FIXED: Only pass the job data — no world position needed anymore!
+        infoCard.show(obj.userData.job);
+        return; // Prevent hiding if we clicked an orb
+      }
+    }
+
+    // Clicked on empty space → hide the info card
+    infoCard.hide();
+  }
+}
+
 export function updateExperience(camera, mouseVec) {
   let hoveredOrb = null;
 
   if (mouseVec) {
     raycaster.setFromCamera(mouseVec, camera);
-    // Raycast against the group's children (the hitbox)
     const intersects = raycaster.intersectObjects(billboardOrbs, true);
     if (intersects.length > 0) {
       let obj = intersects[0].object;
@@ -238,14 +294,14 @@ export function updateExperience(camera, mouseVec) {
 
     pMat.uniforms.time.value = performance.now() * 0.001;
     pMat.uniforms.flow.value += ((isHovered ? 1.0 : 0.0) - pMat.uniforms.flow.value) * 0.12;
-    
+
     lMat.opacity += ((isHovered ? 0.0 : 1.0) - lMat.opacity) * 0.15;
     cMat.opacity += ((isHovered ? 0.0 : 0.7) - cMat.opacity) * 0.15;
     tMat.opacity += ((isHovered ? 1.0 : 0.0) - tMat.opacity) * 0.15;
 
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'rgba(0, 2, 15, 0.99)'; 
+      ctx.fillStyle = 'rgba(0, 2, 15, 0.99)';
       ctx.beginPath();
       ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
       ctx.fill();
@@ -253,22 +309,22 @@ export function updateExperience(camera, mouseVec) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 40; 
-      ctx.fillStyle = '#ffffff'; 
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = '#ffffff';
 
       let fontSize = 120;
       ctx.font = `bold ${fontSize}px Arial`;
       const textWidth = ctx.measureText(job.title).width;
-      const maxWidth = canvas.width * 0.9; 
+      const maxWidth = canvas.width * 0.9;
       if (textWidth > maxWidth) fontSize = Math.floor(fontSize * (maxWidth / textWidth));
-      
-      ctx.font = `bold ${fontSize}px Arial`; 
+
+      ctx.font = `bold ${fontSize}px Arial`;
       ctx.fillText(job.title, canvas.width / 2, canvas.height / 2 - 45);
 
       ctx.shadowBlur = 15;
       ctx.font = '72px Arial';
       ctx.fillText(job.years, canvas.width / 2, canvas.height / 2 + 85);
-      
+
       tMat.map.needsUpdate = true;
     }
 
@@ -277,6 +333,7 @@ export function updateExperience(camera, mouseVec) {
     orb.lookAt(camera.position);
   });
 
+  // Dim background when hovering
   if (sceneRef) {
     currentDimLevel += ((hoveredOrb ? 0.1 : 1.0) - currentDimLevel) * 0.1;
     sceneRef.traverse(child => {
@@ -286,5 +343,10 @@ export function updateExperience(camera, mouseVec) {
         child.material.opacity = child.userData.baseOp * currentDimLevel;
       }
     });
+  }
+
+  // Update info card animation
+  if (infoCard) {
+    infoCard.update();
   }
 }

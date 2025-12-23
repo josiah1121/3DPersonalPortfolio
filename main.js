@@ -9,7 +9,12 @@ import { setupCursor } from './src/cursor.js';
 import { createPlayer } from './src/player.js';
 import { initDust, updateDust } from './src/dust.js';
 import { createAboutArea, updateAboutLetters } from './src/about.js';
-import { createExperienceArea, updateExperience } from './src/experience.js';
+import { 
+  createExperienceArea, 
+  updateExperience,
+  handlePointerDown as expHandlePointerDown,
+  handlePointerUp as expHandlePointerUp
+} from './src/experience.js';
 import { createSkillsArea, updateSkills, setOrbitControls } from './src/skills.js';
 import { createSkillsTitle, updateSkillsTitle } from './src/skillsTitle.js';
 import { createExperienceTitle, updateExperienceTitle } from './src/experienceTitle.js';
@@ -112,8 +117,14 @@ createSkillsTitle(scene, skillsArea);
 //const contactArea = createContactArea(scene);
 setOrbitControls(controls);
 //const aboutArea = createAboutArea(scene);
-const experienceArea = createExperienceArea(scene);
+const experienceArea = createExperienceArea(scene, camera); // ← Pass camera here!
 createExperienceTitle(scene);
+
+// ————————————————————————
+// CLICK HANDLING FOR EXPERIENCE INFOCARD
+// ————————————————————————
+window.addEventListener('pointerdown', (e) => expHandlePointerDown(e, camera));
+window.addEventListener('pointerup', (e) => expHandlePointerUp(e, camera));
 
 // ————————————————————————
 // ANIMATION LOOP
@@ -143,10 +154,9 @@ function animate() {
   renderer.render(scene, camera);
 
   //updateAboutLetters(delta);
-  const raycaster = new THREE.Raycaster();
   updateExperienceTitle(camera);
-  updateExperience(camera, cursorMouse);
-  updateSkills(camera, cursorMouse, raycaster);
+  updateExperience(camera, cursorMouse);        // ← Hover + InfoCard update
+  updateSkills(camera, cursorMouse);
   updateSkillsTitle(camera, delta);
 }
 
