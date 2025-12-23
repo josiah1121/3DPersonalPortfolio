@@ -1,4 +1,4 @@
-// src/experience.js — Final Fix: Dynamic Text Scaling & Subtle Star-Pulse Idle State
+// src/experience.js — Aggressive Jelly with Surface Tension logic
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -64,10 +64,11 @@ export function createExperienceArea(scene) {
     orbGroup.add(hitbox);
 
     // === PARTICLE ORB ===
-    const particleCount = 1200;
+    const particleCount = 1500; // Even denser for "liquid" look
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const targets = new Float32Array(particleCount * 3);
+    const phases = new Float32Array(particleCount); 
     
     for (let j = 0; j < particleCount; j++) {
       const u = Math.random();
@@ -75,19 +76,20 @@ export function createExperienceArea(scene) {
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
       
-      // Initial Sphere
       positions[j*3] = 120 * Math.sin(phi) * Math.cos(theta);
       positions[j*3+1] = 120 * Math.sin(phi) * Math.sin(theta);
       positions[j*3+2] = 120 * Math.cos(phi);
 
-      // Hover C-Ring
       const angle = 0.5 + Math.random() * 5.3; 
       targets[j*3] = Math.cos(angle) * 280; 
       targets[j*3+1] = Math.sin(angle) * 280;
-      targets[j*3+2] = (Math.random() - 0.5) * 30;
+      targets[j*3+2] = (Math.random() - 0.5) * 50;
+
+      phases[j] = Math.random() * Math.PI * 2;
     }
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('targetPosition', new THREE.BufferAttribute(targets, 3));
+    geometry.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
 
     const partMat = new THREE.ShaderMaterial({
       uniforms: {
@@ -97,37 +99,48 @@ export function createExperienceArea(scene) {
       },
       vertexShader: `
         attribute vec3 targetPosition;
+        attribute float phase;
         uniform float time;
         uniform float flow;
         
         void main() {
           vec3 idlePos = position;
-          
-          // --- Subtle Star Pulse (Idle State Only) ---
-          // Creates a geometric wave based on the sphere's normal direction
-          float pulseStrength = 1.0 - flow; // Fade out effect as we hover
-          if (pulseStrength > 0.01) {
-            vec3 normal = normalize(position);
-            // Use abs() to create sharper, star-like peaks
-            float wave = abs(sin(normal.x * 3.0 + time)) * abs(cos(normal.y * 3.0 + time));
-            idlePos += normal * (wave * 25.0 * pulseStrength);
+          float pStr = 1.0 - flow;
+
+          if (pStr > 0.01) {
+            vec3 norm = normalize(position);
             
-            // Add a slow overall breath
-            idlePos *= (1.0 + sin(time * 0.5) * 0.05 * pulseStrength);
+            // 1. Aggressive Secondary Motion
+            // Multi-layered waves for "thick" liquid feel
+            float waveA = sin(time * 2.0 + (position.y * 0.03)) * 15.0;
+            float waveB = cos(time * 3.5 + (position.x * 0.02)) * 8.0;
+            
+            // 2. Edge Cohesion Logic (Surface Tension)
+            // Points are pulled toward wave peaks more aggressively
+            float tension = pow(abs(sin(time * 1.5 + norm.y * 5.0)), 3.0);
+            idlePos += norm * (waveA + waveB) * tension * pStr;
+
+            // 3. Elastic "Oval" Deformation
+            float stretchX = 1.0 + sin(time * 2.5) * 0.2 * pStr;
+            float stretchY = 1.0 + cos(time * 2.0) * 0.15 * pStr;
+            idlePos.x *= stretchX;
+            idlePos.y *= stretchY;
+
+            // 4. Liquid Drift
+            idlePos.xy += vec2(sin(time + phase), cos(time + phase)) * 6.0 * pStr;
           }
 
           vec3 pos = mix(idlePos, targetPosition, flow);
           
-          // --- Hover Rotation (Ring State) ---
           if(flow > 0.1) {
              float r = length(pos.xy);
-             float ang = atan(pos.y, pos.x) + time * 1.5;
+             float ang = atan(pos.y, pos.x) + time * 2.2; // Faster vortex
              pos.x = cos(ang) * r;
              pos.y = sin(ang) * r;
           }
           
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-          gl_PointSize = 7.0 * (300.0 / -mvPosition.z);
+          gl_PointSize = 8.5 * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
@@ -136,9 +149,9 @@ export function createExperienceArea(scene) {
         void main() {
           float dist = length(gl_PointCoord - vec2(0.5));
           if (dist > 0.5) discard;
-          // Soften edges slightly for more of a glow
-          float alpha = smoothstep(0.5, 0.2, dist);
-          gl_FragColor = vec4(color, alpha);
+          // More opaque particles for a "thicker" material look
+          float alpha = smoothstep(0.5, 0.05, dist);
+          gl_FragColor = vec4(color, alpha * 0.95);
         }
       `,
       transparent: true,
@@ -149,7 +162,6 @@ export function createExperienceArea(scene) {
     const points = new THREE.Points(geometry, partMat);
     orbGroup.add(points);
 
-    // === ENHANCED TEXT PLANE ===
     const canvas = document.createElement('canvas');
     canvas.width = 1200; 
     canvas.height = 512;
@@ -202,31 +214,24 @@ export function updateExperience(camera, mouseVec) {
     const canvas = orb.userData.canvas;
 
     pMat.uniforms.time.value = performance.now() * 0.001;
-    const targetFlow = isHovered ? 1.0 : 0.0;
-    pMat.uniforms.flow.value += (targetFlow - pMat.uniforms.flow.value) * 0.12;
-
-    const targetAlpha = isHovered ? 1.0 : 0.0;
-    tMat.opacity += (targetAlpha - tMat.opacity) * 0.15;
+    pMat.uniforms.flow.value += ((isHovered ? 1.0 : 0.0) - pMat.uniforms.flow.value) * 0.12;
+    tMat.opacity += ((isHovered ? 1.0 : 0.0) - tMat.opacity) * 0.15;
 
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
       let fontSize = 100;
       ctx.font = `bold ${fontSize}px Arial`;
       const textWidth = ctx.measureText(job.title).width;
       const maxWidth = canvas.width - 120; 
-      if (textWidth > maxWidth) {
-          fontSize = Math.floor(fontSize * (maxWidth / textWidth));
-      }
+      if (textWidth > maxWidth) fontSize = Math.floor(fontSize * (maxWidth / textWidth));
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillStyle = 'rgba(0, 2, 12, 0.95)'; 
       ctx.beginPath();
       ctx.roundRect(40, 80, canvas.width - 80, 350, 60);
       ctx.fill();
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 15;
       ctx.fillStyle = '#ffffff';
@@ -241,15 +246,13 @@ export function updateExperience(camera, mouseVec) {
       tMat.map.needsUpdate = true;
     }
 
-    const targetScale = isHovered ? 1.25 : 1.0;
-    orb.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+    const s = isHovered ? 1.25 : 1.0;
+    orb.scale.lerp(new THREE.Vector3(s, s, s), 0.1);
     orb.lookAt(camera.position);
   });
 
   if (sceneRef) {
-    const targetDim = hoveredOrb ? 0.05 : 1.0;
-    currentDimLevel += (targetDim - currentDimLevel) * 0.1;
-
+    currentDimLevel += ((hoveredOrb ? 0.05 : 1.0) - currentDimLevel) * 0.1;
     sceneRef.traverse(child => {
       if (child.isMesh && !expGroup.getObjectById(child.id)) {
         if (!child.userData.baseOp) child.userData.baseOp = child.material.opacity || 1;
