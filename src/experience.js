@@ -1,4 +1,4 @@
-// src/experience.js — "Skills" particle title NOW DIMS correctly with everything else
+// src/experience.js — with moving gas-filled plasma orb (nebula/cloud style)
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -66,12 +66,18 @@ export function createExperienceArea(scene) {
     const horizontalLine = new THREE.Mesh(lineTube, lineMat);
     expGroup.add(horizontalLine);
 
-    // Coin
+    // Coin Group
     const coinGroup = new THREE.Group();
     coinGroup.position.copy(lineEnd);
     coinGroup.userData.job = job;
     coinGroup.userData.hovered = false;
 
+    // Invisible hitbox
+    const hitboxGeometry = new THREE.CircleGeometry(180, 32);
+    const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+    coinGroup.add(new THREE.Mesh(hitboxGeometry, hitboxMaterial));
+
+    // Visual rings
     const baseRing = new THREE.RingGeometry(110, 150, 64);
     const ringMat = new THREE.MeshBasicMaterial({
       color: job.color,
@@ -88,11 +94,96 @@ export function createExperienceArea(scene) {
     coreMat.color = new THREE.Color(job.color).multiplyScalar(2.2);
     coinGroup.add(new THREE.Mesh(new THREE.RingGeometry(50, 70, 32), coreMat));
 
+    // Outer halo
     const halo = new THREE.Mesh(baseRing, ringMat.clone());
     halo.scale.set(1.6, 1.6, 1.6);
     halo.material.opacity = 0.25;
     coinGroup.add(halo);
 
+    // === MOVING GAS-FILLED PLASMA ORB ===
+    const particleCount = 12000;
+    const positions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      let x, y, z, distSq;
+      do {
+        x = Math.random() * 2 - 1;
+        y = Math.random() * 2 - 1;
+        z = Math.random() * 2 - 1;
+        distSq = x * x + y * y + z * z;
+      } while (distSq >= 1.0);
+
+      const radius = 48;
+      positions[i * 3]     = x * radius;
+      positions[i * 3 + 1] = y * radius;
+      positions[i * 3 + 2] = z * radius;
+    }
+
+    const orbGeometry = new THREE.BufferGeometry();
+    orbGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const orbMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        baseColor: { value: new THREE.Color(0xaa22ff) },       // Deep purple core
+        highlightColor: { value: new THREE.Color(0xff66ff) },  // Bright pink/magenta highlights
+        // For electric blue version, uncomment below and comment above:
+        // baseColor: { value: new THREE.Color(0x0088ff) },
+        // highlightColor: { value: new THREE.Color(0x00ffff) },
+        intensity: { value: 1.0 },
+        time: { value: 0 }
+      },
+      vertexShader: `
+        uniform float time;
+        uniform float intensity;
+        varying vec3 vPos;
+        void main() {
+          vPos = position;
+          vec3 pos = position;
+          
+          // Gentle breathing
+          float breath = 1.0 + sin(time * 0.5) * 0.04;
+          pos *= breath;
+          
+          // Swirling internal gas motion
+          float turb = sin(time * 0.7 + length(position) * 0.15) * 5.0;
+          pos += normalize(position) * turb;
+          
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_PointSize = 5.8 * intensity * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 baseColor;
+        uniform vec3 highlightColor;
+        uniform float intensity;
+        varying vec3 vPos;
+        void main() {
+          vec2 uv = gl_PointCoord - 0.5;
+          float dist = length(uv);
+          if (dist > 0.5) discard;
+          
+          float alpha = smoothstep(0.5, 0.05, dist);
+          
+          // Strong volumetric center glow
+          float centerDist = length(vPos) / 48.0;
+          float density = pow(1.0 - centerDist, 3.5);
+          
+          // Color gradient: pink highlights on edges, purple in core
+          vec3 color = mix(highlightColor, baseColor, centerDist);
+          
+          gl_FragColor = vec4(color * 2.4, alpha * density * intensity * 1.8);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const plasmaOrb = new THREE.Points(orbGeometry, orbMaterial);
+    coinGroup.add(plasmaOrb);
+
+    coinGroup.userData.plasmaOrb = plasmaOrb;
     coinGroup.userData.baseRotation = 0.003 + Math.random() * 0.003;
 
     expGroup.add(coinGroup);
@@ -102,7 +193,6 @@ export function createExperienceArea(scene) {
     const labelCanvas = document.createElement('canvas');
     labelCanvas.width = 1600;
     labelCanvas.height = 500;
-
     const ctx = labelCanvas.getContext('2d');
 
     const labelTex = new THREE.CanvasTexture(labelCanvas);
@@ -142,7 +232,7 @@ export function updateExperience(camera, mouseVec) {
     }
   }
 
-  // Update hover labels (unchanged)
+  // Update hover labels
   expGroup.traverse(child => {
     if (child.userData.label) {
       const item = child.userData.label;
@@ -157,32 +247,51 @@ export function updateExperience(camera, mouseVec) {
         const ctx = item.ctx;
         ctx.clearRect(0, 0, item.canvas.width, item.canvas.height);
 
-        ctx.fillStyle = `rgba(15, 35, 80, ${currentOpacity * 0.9})`;
+        ctx.fillStyle = 'rgba(5, 15, 40, 1.0)';
         ctx.fillRect(0, 0, item.canvas.width, item.canvas.height);
 
-        ctx.strokeStyle = `rgba(0, 255, 255, ${currentOpacity * 0.9})`;
-        ctx.lineWidth = 14;
+        ctx.strokeStyle = `rgba(0, 255, 255, ${currentOpacity})`;
+        ctx.lineWidth = 20;
         ctx.strokeRect(40, 40, item.canvas.width - 80, item.canvas.height - 80);
 
-        ctx.strokeStyle = `rgba(0, 255, 255, ${currentOpacity * 0.4})`;
-        ctx.lineWidth = 20;
-        ctx.strokeRect(60, 60, item.canvas.width - 120, item.canvas.height - 120);
+        ctx.strokeStyle = `rgba(0, 255, 255, ${currentOpacity * 0.6})`;
+        ctx.lineWidth = 30;
+        ctx.strokeRect(70, 70, item.canvas.width - 140, item.canvas.height - 140);
 
         const job = child.userData.job;
 
         ctx.font = 'bold 135px Arial';
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 100 * currentOpacity;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 8;
+        ctx.strokeText(job.title, item.canvas.width / 2, 170);
+
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 140 * currentOpacity;
         ctx.fillText(job.title, item.canvas.width / 2, 170);
 
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 4;
+        ctx.shadowOffsetY = 4;
+
         ctx.font = '80px Arial';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 6;
+        ctx.strokeText(job.years, item.canvas.width / 2, 320);
+
         ctx.fillStyle = '#ffffff';
         ctx.shadowColor = '#88ffff';
-        ctx.shadowBlur = 80 * currentOpacity;
+        ctx.shadowBlur = 100 * currentOpacity;
         ctx.fillText(job.years, item.canvas.width / 2, 320);
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
 
         item.mesh.material.map.needsUpdate = true;
       }
@@ -192,7 +301,6 @@ export function updateExperience(camera, mouseVec) {
   if (sceneRef) {
     projectsBillboards = [];
 
-    // Find skillsGroup once
     if (!skillsGroupRef) {
       sceneRef.traverse(child => {
         if (
@@ -206,7 +314,6 @@ export function updateExperience(camera, mouseVec) {
       });
     }
 
-    // Find "Skills" particle title group once
     if (!skillsTitleGroupRef) {
       sceneRef.traverse(child => {
         if (
@@ -222,7 +329,6 @@ export function updateExperience(camera, mouseVec) {
       });
     }
 
-    // Cache originals
     sceneRef.traverse(child => {
       if (child.material) {
         const mat = child.material;
@@ -248,12 +354,25 @@ export function updateExperience(camera, mouseVec) {
     const targetDim = isAnyCoinHovered ? 0.001 : 1.0;
     currentDimLevel += (targetDim - currentDimLevel) * 0.12;
 
-    // Dim projects
+    // === PLASMA ORB ANIMATION ===
+    billboardCoins.forEach(coin => {
+      if (coin.userData.plasmaOrb) {
+        const material = coin.userData.plasmaOrb.material;
+        material.uniforms.time.value = time;
+
+        const targetIntensity = coin.userData.hovered ? 0.3 : 1.0;
+        material.uniforms.intensity.value += 
+          (targetIntensity - material.uniforms.intensity.value) * 0.12;
+      }
+
+      const targetScale = coin.userData.hovered ? 1.2 : 1.0;
+      coin.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.2);
+    });
+
     projectsBillboards.forEach(obj => {
       obj.material.opacity = obj.userData.originalOpacity * currentDimLevel;
     });
 
-    // Dim skills dome + contents
     if (skillsGroupRef) {
       skillsGroupRef.traverse(child => {
         if (!child.material) return;
@@ -296,16 +415,13 @@ export function updateExperience(camera, mouseVec) {
       });
     }
 
-    // === DIM "SKILLS" PARTICLE TITLE — now correctly dims while preserving animation ===
     if (skillsTitleGroupRef) {
       const points = skillsTitleGroupRef.children.find(c => c instanceof THREE.Points);
       if (points && points.geometry.attributes.alpha) {
         const alphaAttr = points.geometry.attributes.alpha;
-        // Cache original animated alphas on first run
         if (!points.userData.originalAlphas) {
           points.userData.originalAlphas = alphaAttr.array.slice();
         }
-        // Apply global dim on top of current animated values
         for (let i = 0; i < alphaAttr.count; i++) {
           alphaAttr.array[i] = points.userData.originalAlphas[i] * currentDimLevel;
         }
@@ -313,7 +429,6 @@ export function updateExperience(camera, mouseVec) {
       }
     }
 
-    // Restore experience area
     expGroup.traverse(child => {
       if (child.material && child.userData.originalOpacity !== undefined && !hoverLabels.includes(child)) {
         child.material.opacity = child.userData.originalOpacity;
@@ -321,11 +436,8 @@ export function updateExperience(camera, mouseVec) {
     });
   }
 
-  // Coin effects
   billboardCoins.forEach(coin => {
     coin.lookAt(camera.position);
     coin.rotation.z += coin.userData.baseRotation;
-    const targetScale = coin.userData.hovered ? 1.2 : 1.0;
-    coin.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.2);
   });
 }
