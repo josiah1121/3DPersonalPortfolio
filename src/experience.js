@@ -1,4 +1,4 @@
-// src/experience.js — Final Fix: Dynamic Text Scaling for Long Titles
+// src/experience.js — Final Fix: Dynamic Text Scaling & Subtle Star-Pulse Idle State
 import * as THREE from 'three';
 
 let expGroup = null;
@@ -74,12 +74,15 @@ export function createExperienceArea(scene) {
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
+      
+      // Initial Sphere
       positions[j*3] = 120 * Math.sin(phi) * Math.cos(theta);
       positions[j*3+1] = 120 * Math.sin(phi) * Math.sin(theta);
       positions[j*3+2] = 120 * Math.cos(phi);
 
+      // Hover C-Ring
       const angle = 0.5 + Math.random() * 5.3; 
-      targets[j*3] = Math.cos(angle) * 280; // Slightly larger ring for wider text
+      targets[j*3] = Math.cos(angle) * 280; 
       targets[j*3+1] = Math.sin(angle) * 280;
       targets[j*3+2] = (Math.random() - 0.5) * 30;
     }
@@ -96,14 +99,33 @@ export function createExperienceArea(scene) {
         attribute vec3 targetPosition;
         uniform float time;
         uniform float flow;
+        
         void main() {
-          vec3 pos = mix(position, targetPosition, flow);
+          vec3 idlePos = position;
+          
+          // --- Subtle Star Pulse (Idle State Only) ---
+          // Creates a geometric wave based on the sphere's normal direction
+          float pulseStrength = 1.0 - flow; // Fade out effect as we hover
+          if (pulseStrength > 0.01) {
+            vec3 normal = normalize(position);
+            // Use abs() to create sharper, star-like peaks
+            float wave = abs(sin(normal.x * 3.0 + time)) * abs(cos(normal.y * 3.0 + time));
+            idlePos += normal * (wave * 25.0 * pulseStrength);
+            
+            // Add a slow overall breath
+            idlePos *= (1.0 + sin(time * 0.5) * 0.05 * pulseStrength);
+          }
+
+          vec3 pos = mix(idlePos, targetPosition, flow);
+          
+          // --- Hover Rotation (Ring State) ---
           if(flow > 0.1) {
              float r = length(pos.xy);
              float ang = atan(pos.y, pos.x) + time * 1.5;
              pos.x = cos(ang) * r;
              pos.y = sin(ang) * r;
           }
+          
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           gl_PointSize = 7.0 * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
@@ -112,8 +134,11 @@ export function createExperienceArea(scene) {
       fragmentShader: `
         uniform vec3 color;
         void main() {
-          if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
-          gl_FragColor = vec4(color, 1.0);
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          // Soften edges slightly for more of a glow
+          float alpha = smoothstep(0.5, 0.2, dist);
+          gl_FragColor = vec4(color, alpha);
         }
       `,
       transparent: true,
@@ -126,7 +151,7 @@ export function createExperienceArea(scene) {
 
     // === ENHANCED TEXT PLANE ===
     const canvas = document.createElement('canvas');
-    canvas.width = 1200; // Widened from 1024 to prevent cutoff
+    canvas.width = 1200; 
     canvas.height = 512;
     const tex = new THREE.CanvasTexture(canvas);
     
@@ -138,7 +163,6 @@ export function createExperienceArea(scene) {
       depthWrite: false
     });
     
-    // Matched the wider 1200/512 aspect ratio here (approx 2.34:1)
     const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(600, 256), textMat);
     textMesh.position.set(0, 0, 15);
     textMesh.renderOrder = 999; 
@@ -187,16 +211,14 @@ export function updateExperience(camera, mouseVec) {
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Dynamic scaling: If title is very long, shrink font size
       let fontSize = 100;
       ctx.font = `bold ${fontSize}px Arial`;
       const textWidth = ctx.measureText(job.title).width;
-      const maxWidth = canvas.width - 120; // Allow 60px padding on each side
+      const maxWidth = canvas.width - 120; 
       if (textWidth > maxWidth) {
           fontSize = Math.floor(fontSize * (maxWidth / textWidth));
       }
 
-      // Backdrop - Adjusted to match the wider canvas
       ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.beginPath();
       ctx.roundRect(40, 80, canvas.width - 80, 350, 60);
@@ -205,14 +227,12 @@ export function updateExperience(camera, mouseVec) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Title - Pure White with Glow
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 15;
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${fontSize}px Arial`; 
       ctx.fillText(job.title, canvas.width / 2, 210);
 
-      // Years - High Contrast
       ctx.shadowBlur = 0;
       ctx.fillStyle = '#e0e0e0';
       ctx.font = '64px Arial';
