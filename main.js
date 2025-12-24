@@ -15,7 +15,7 @@ import {
   handlePointerDown as expHandlePointerDown,
   handlePointerUp as expHandlePointerUp
 } from './src/experience.js';
-import { createSkillsArea, updateSkills, setOrbitControls } from './src/skills.js';
+import { createSkillsArea, updateSkills, setOrbitControls, setInfoCard } from './src/skills.js';
 import { createSkillsTitle, updateSkillsTitle } from './src/skillsTitle.js';
 import { createExperienceTitle, updateExperienceTitle } from './src/experienceTitle.js';
 import { createNeonTunnel } from './src/neonTunnel.js';
@@ -115,10 +115,17 @@ const { tunnelGroup, updateNeonTunnel } = createNeonTunnel(scene);
 const skillsArea = createSkillsArea(scene);
 createSkillsTitle(scene, skillsArea);
 //const contactArea = createContactArea(scene);
+const experienceResults = createExperienceArea(scene, camera); 
+const experienceArea = experienceResults.group;
+createExperienceTitle(scene);
+if (experienceResults && experienceResults.infoCard) {
+  console.log("Bridge: InfoCard found and set to Skills");
+  setInfoCard(experienceResults.infoCard);
+} else {
+  console.error("Bridge: InfoCard NOT found in experienceResults!");
+}
 setOrbitControls(controls);
 //const aboutArea = createAboutArea(scene);
-const experienceArea = createExperienceArea(scene, camera); // ← Pass camera here!
-createExperienceTitle(scene);
 
 // ————————————————————————
 // CLICK HANDLING FOR EXPERIENCE INFOCARD
@@ -156,6 +163,9 @@ function animate() {
   //updateAboutLetters(delta);
   updateExperienceTitle(camera);
   updateExperience(camera, cursorMouse);        // ← Hover + InfoCard update
+  if (experienceResults && experienceResults.infoCard) {
+    experienceResults.infoCard.update();
+  }
   updateSkills(camera, cursorMouse);
   updateSkillsTitle(camera, delta);
 }

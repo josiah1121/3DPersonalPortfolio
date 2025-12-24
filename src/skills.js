@@ -2,6 +2,12 @@
 import * as THREE from 'three';
 import { mouse, isMouseOver } from './cursor.js';
 
+let infoCardRef = null; // Bridge to infoCard component
+
+export function setInfoCard(card) {
+  infoCardRef = card;
+}
+
 function generateParticleTexture() {
   const size = 64;
   const canvas = document.createElement('canvas');
@@ -21,18 +27,78 @@ const particleTexture = generateParticleTexture();
 let skillsGroup = null;
 
 const skills = [
-  { name: "Python", color: 0x44aa88 },
-  { name: "Swift", color: 0x88dddd },
-  { name: "JavaScript", color: 0xdddd88 },
-  { name: "AWS", color: 0xccaa77 },
-  { name: "Three.js", color: 0x88aadd },
-  { name: "DevOps", color: 0xccaaff },
-  { name: "Git", color: 0xdddddd },
-  { name: "MongoDB", color: 0x88cc88 },
-  { name: "Firebase", color: 0xddbb88 },
-  { name: "TypeScript", color: 0x3178c6 },
-  { name: "C++", color: 0x00599c },
-  { name: "Linux", color: 0xffa500 }
+  {
+    "name": "Python",
+    "color": 0x44aa88,
+    "years": "Data & Automation",
+    "description": "Leveraged Python to build end-to-end data pipelines, perform advanced analytics and visualization, and automate complex business and operational processes."
+  },
+  {
+    "name": "Swift",
+    "color": 0x88dddd,
+    "years": "iOS/Mobile",
+    "description": "Built engaging and user-friendly consumer iOS applications using Swift, SwiftUI, and modern Apple frameworks to deliver practical, everyday value to users."
+  },
+  {
+    "name": "JavaScript",
+    "color": 0xdddd88,
+    "years": "Automation & Web",
+    "description": "Automated business workflows and operations using JavaScript, including custom integrations and scripts in Zapier, Make.com, and Node.js to streamline processes, sync data across tools, and eliminate repetitive tasks."
+  },
+  { name: "AWS", 
+    color: 0xccaa77, 
+    years: "Cloud Infrastructure", 
+    description: "Implemented serverless architectures using Lambda and S3 for scalable data storage solutions." 
+  },
+  {
+    "name": "Three.js",
+    "color": 0x88aadd,
+    "years": "3D Web Experiences",
+    "description": "Built immersive and interactive 3D websites and web applications using Three.js, creating engaging visual experiences such as product showcases, architectural visualizations, portfolio sites, and creative landing pages."
+  },
+  { name: "DevOps", 
+    color: 0xccaaff, 
+    years: "CI/CD", 
+    description: "Architected robust pipelines for safety-critical embedded software, ensuring high-reliability deployments." 
+  },
+  { name: "Git", 
+    color: 0xdddddd, 
+    years: "Version Control", 
+    description: "Managed complex multi-branch release cycles for mission-critical software environments." 
+  },
+  { name: "MongoDB", 
+    color: 0x88cc88, 
+    years: "NoSQL Databases", 
+    description: "Designed schema-less data structures for high-speed logging and asynchronous event tracking."
+  },
+  { name: "Firebase", 
+    color: 0xddbb88, 
+    years: "Real-time Services", 
+    description: "Utilized real-time listeners for instant synchronization across distributed interfaces."
+  },
+  {
+    "name": "TypeScript",
+    "color": 0x3178c6,
+    "years": "Server & Automation",
+    "description": "Built server-side TypeScript applications (Node.js) to automate daily data analysis pipelines, including scheduled data ingestion, processing, transformation, and reporting with strict type safety."
+  },
+  {
+    "name": "C++",
+    "color": 0x00599c,
+    "years": "Embedded & Hardware Testing",
+    "description": "Developed hardware-in-the-loop (HIL) testing modules in C++ to interface with missile system components, verify health and functionality through automated tests, and communicate with sensors, actuators, and control units; also gained embedded systems experience prototyping and controlling devices with Arduino."
+  },
+  { name: "Linux", 
+    color: 0xffa500, 
+    years: "Platform Engineering", 
+    description: "Developed and tested real-time software for mission-critical hardware-in-the-loop systems on RTOS and embedded Linux platforms." 
+  },
+  {
+    "name": "Groovy",
+    "color": 0x619dbc,
+    "years": "CI/CD Pipelines",
+    "description": "Wrote declarative and scripted Jenkins pipelines in Groovy to orchestrate complex build, test, and deployment workflows; developed reusable shared libraries for standardized pipeline infrastructure across teams and projects."
+  }
 ];
 
 const cloudParticles = 2500;
@@ -361,6 +427,7 @@ export function createSkillsArea(scene) {
     const originalPos = orbGroup.position.clone();
 
     orbGroup.userData = {
+      skillData: skill, // Store description data
       cloud,
       textParticles,
       glowHalo,
@@ -388,7 +455,8 @@ export function createSkillsArea(scene) {
 }
 
 function onPointerDown(event) {
-  if (!isMouseOver || !skillsGroup || !orbitControls || event.button !== 0) return;
+  console.log("Pointer Down Detected");
+  if (!isMouseOver || !skillsGroup || !orbitControls) return;
 
   raycaster.setFromCamera(mouse, orbitControls.object);
   const intersects = raycaster.intersectObjects(skillsGroup.children, true);
@@ -445,10 +513,30 @@ function onPointerMove(event) {
   }
 }
 
+// Inside src/skills.js - Replace the onPointerUp function
 function onPointerUp(event) {
-  if (grabbedOrb && isDragging) {
-    orbitControls.enabled = true;
+  if (grabbedOrb) {
+    // INCREASE TOLERANCE: Check if we actually moved much
+    const dx = event.clientX - startMouse.x;
+    const dy = event.clientY - startMouse.y;
+    const moved = Math.hypot(dx, dy);
+
+    // If we didn't drag far, treat it as a click
+    if (moved < dragThreshold && infoCardRef && grabbedOrb.userData.skillData) {
+      const data = grabbedOrb.userData.skillData;
+      console.log("Skills: Requesting show for", data.name); // ADD THIS
+      infoCardRef.show({
+        title: data.name,
+        years: data.years || "Skill Proficiency",
+        description: data.description || "Expertise and application of this technology."
+      });
+    }
+
+    if (isDragging) {
+      orbitControls.enabled = true;
+    }
   }
+  
   grabbedOrb = null;
   isDragging = false;
 }

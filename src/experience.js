@@ -230,7 +230,10 @@ export function createExperienceArea(scene, camera) {
     billboardOrbs.push(orbGroup);
   });
 
-  return expGroup;
+  return {
+    group: expGroup,
+    infoCard: infoCard
+  };
 }
 
 // Click handlers (call these from your main app)
@@ -239,6 +242,8 @@ export function handlePointerDown(event, camera) {
   mouseDownPos.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouseDownPos.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
+
+// src/experience.js
 
 export function handlePointerUp(event, camera) {
   if (!isMouseDown) return;
@@ -249,7 +254,6 @@ export function handlePointerUp(event, camera) {
     -(event.clientY / window.innerHeight) * 2 + 1
   );
 
-  // Simple click detection
   if (mouseDownPos.distanceTo(mouseUpPos) < 0.02) {
     raycaster.setFromCamera(mouseUpPos, camera);
     const intersects = raycaster.intersectObjects(billboardOrbs, true);
@@ -258,14 +262,17 @@ export function handlePointerUp(event, camera) {
       let obj = intersects[0].object;
       while (obj && !obj.userData.job) obj = obj.parent;
       if (obj && obj.userData.job) {
-        // FIXED: Only pass the job data — no world position needed anymore!
         infoCard.show(obj.userData.job);
-        return; // Prevent hiding if we clicked an orb
+        return; 
       }
     }
 
-    // Clicked on empty space → hide the info card
-    infoCard.hide();
+    // --- THE FIX IS HERE ---
+    // Only hide the card if the camera is actually looking at the Experience section.
+    // If camera.position.z is greater than -2000, we assume the user is at Skills or elsewhere.
+    if (camera.position.z < -2000) {
+      infoCard.hide();
+    }
   }
 }
 
