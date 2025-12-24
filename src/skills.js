@@ -29,7 +29,10 @@ const skills = [
   { name: "DevOps", color: 0xccaaff },
   { name: "Git", color: 0xdddddd },
   { name: "MongoDB", color: 0x88cc88 },
-  { name: "Firebase", color: 0xddbb88 }
+  { name: "Firebase", color: 0xddbb88 },
+  { name: "TypeScript", color: 0x3178c6 },
+  { name: "C++", color: 0x00599c },
+  { name: "Linux", color: 0xffa500 }
 ];
 
 const cloudParticles = 2500;

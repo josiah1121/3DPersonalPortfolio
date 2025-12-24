@@ -284,6 +284,11 @@ export function updateExperience(camera, mouseVec) {
 
   billboardOrbs.forEach(orb => {
     const isHovered = (orb === hoveredOrb);
+    
+    // Check if the hover state actually changed to avoid redrawing every frame
+    const stateChanged = orb.userData.lastHoverState !== isHovered;
+    orb.userData.lastHoverState = isHovered;
+
     const job = orb.userData.job;
     const pMat = orb.userData.particleOrb.material;
     const lMat = orb.userData.lightning.material;
@@ -292,38 +297,56 @@ export function updateExperience(camera, mouseVec) {
     const ctx = orb.userData.ctx;
     const canvas = orb.userData.canvas;
 
-    pMat.uniforms.time.value = performance.now() * 0.001;
+    const time = performance.now() * 0.001;
+    pMat.uniforms.time.value = time;
     pMat.uniforms.flow.value += ((isHovered ? 1.0 : 0.0) - pMat.uniforms.flow.value) * 0.12;
 
     lMat.opacity += ((isHovered ? 0.0 : 1.0) - lMat.opacity) * 0.15;
     cMat.opacity += ((isHovered ? 0.0 : 0.7) - cMat.opacity) * 0.15;
     tMat.opacity += ((isHovered ? 1.0 : 0.0) - tMat.opacity) * 0.15;
 
+    // Only redraw if the text is visible AND either the state changed OR we need to pulse the hint
     if (tMat.opacity > 0.01) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'rgba(0, 2, 15, 0.99)';
+      
+      // 1. GENTLE BACKDROP: Lower opacity (0.7) lets lightning show through
+      ctx.fillStyle = 'rgba(0, 2, 15, 0.7)'; 
       ctx.beginPath();
       ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      
+      // 2. JOB TITLE: Pure White + Double-draw for "Boldness"
       ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 40;
+      ctx.shadowBlur = 35;
       ctx.fillStyle = '#ffffff';
 
       let fontSize = 120;
       ctx.font = `bold ${fontSize}px Arial`;
       const textWidth = ctx.measureText(job.title).width;
-      const maxWidth = canvas.width * 0.9;
+      const maxWidth = canvas.width * 0.85;
       if (textWidth > maxWidth) fontSize = Math.floor(fontSize * (maxWidth / textWidth));
 
       ctx.font = `bold ${fontSize}px Arial`;
-      ctx.fillText(job.title, canvas.width / 2, canvas.height / 2 - 45);
+      // Drawing twice adds weight/brightness in Additive mode
+      ctx.fillText(job.title, canvas.width / 2, canvas.height / 2 - 60);
+      ctx.fillText(job.title, canvas.width / 2, canvas.height / 2 - 60);
 
+      // 3. YEARS: High-Vibrancy Cyan/White mix
       ctx.shadowBlur = 15;
       ctx.font = '72px Arial';
-      ctx.fillText(job.years, canvas.width / 2, canvas.height / 2 + 85);
+      ctx.fillStyle = '#e6f7ff'; 
+      ctx.fillText(job.years, canvas.width / 2, canvas.height / 2 + 50);
+
+      // 4. CLICK INDICATOR: Neon Cyan (Strong but thin)
+      ctx.globalAlpha = 0.8;
+      ctx.shadowBlur = 0;
+      ctx.font = 'italic 60px Arial';
+      ctx.fillStyle = '#00ffff'; 
+      ctx.fillText('<— click to view details —>', canvas.width / 2, canvas.height / 2 + 180);
+      ctx.globalAlpha = 1.0;
 
       tMat.map.needsUpdate = true;
     }
@@ -331,7 +354,7 @@ export function updateExperience(camera, mouseVec) {
     const s = isHovered ? 1.25 : 1.0;
     orb.scale.lerp(new THREE.Vector3(s, s, s), 0.1);
     orb.lookAt(camera.position);
-  });
+});
 
   // Dim background when hovering
   if (sceneRef) {
