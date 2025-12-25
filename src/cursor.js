@@ -1,4 +1,3 @@
-// src/cursor.js
 import * as THREE from 'three';
 
 export const mouse = new THREE.Vector2();
@@ -8,37 +7,37 @@ let mouseVelocity = 0;
 let isVisible = false;
 let trailParticles = [];
 
-const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const intersectPoint = new THREE.Vector3();
+// Re-usable vector for calculations
+const targetPos = new THREE.Vector3();
 
 export function setupCursor(scene, camera, renderer) {
   const dom = renderer.domElement;
+
   dom.style.cursor = 'none';
 
   const spriteTexture = new THREE.TextureLoader().load(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGAoQe5wwAAAABJRU5ErkJggg=='
   );
 
-  // 1. Define Cursor Materials
   const cursorMaterial = new THREE.SpriteMaterial({
     map: spriteTexture,
-    color: 0xffffff,
+    color: 0x00ffff, 
     transparent: true,
     blending: THREE.AdditiveBlending,
-    depthWrite: false
+    depthWrite: false,
+    depthTest: false // FIX: Prevents cursor from being hidden by the ground plane
   });
 
   const glowMaterial = new THREE.SpriteMaterial({
     map: spriteTexture,
-    color: 0xffddaa,
+    color: 0x4488ff,
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    opacity: 0.25
+    opacity: 0.35,
+    depthTest: false // FIX: Prevents glow from being hidden by the ground plane
   });
 
-  // 2. Setup Trail (Moved up so it exists before we use it)
   const trailCount = 800;
   const trailGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(trailCount * 3).fill(0);
@@ -50,7 +49,7 @@ export function setupCursor(scene, camera, renderer) {
   trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
 
   const trailMaterial = new THREE.ShaderMaterial({
-    uniforms: { color: { value: new THREE.Color(0xffaa77) } },
+    uniforms: { color: { value: new THREE.Color(0x88ccff) } },
     vertexShader: `
       attribute float size;
       attribute float alpha;
@@ -58,7 +57,7 @@ export function setupCursor(scene, camera, renderer) {
       void main() {
         vAlpha = alpha;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (300.0 / -mvPosition.z);
+        gl_PointSize = size * (400.0 / -mvPosition.z);
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
@@ -72,48 +71,40 @@ export function setupCursor(scene, camera, renderer) {
     `,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    depthTest: false, // FIX: Prevents trail particles from being hidden by the ground plane
     transparent: true
   });
 
   const trail = new THREE.Points(trailGeometry, trailMaterial);
   trail.visible = false;
+  trail.frustumCulled = false; 
   scene.add(trail);
 
-  // 3. Setup Cursor Group
   const cursorOrb = new THREE.Sprite(cursorMaterial);
-  cursorOrb.scale.set(12, 12, 1);
+  cursorOrb.scale.set(22, 22, 1);
 
   const glow = new THREE.Sprite(glowMaterial);
-  glow.scale.set(60, 60, 1);
+  glow.scale.set(100, 100, 1);
 
   const cursorGroup = new THREE.Group();
-  cursorGroup.name = 'cursorGroup';
   cursorGroup.add(cursorOrb);
   cursorGroup.add(glow);
   cursorGroup.visible = false;
+  cursorGroup.frustumCulled = false; 
   scene.add(cursorGroup);
 
-  // 4. Apply Depth and Render Order (Everything exists now!)
-  cursorMaterial.depthTest = false;
-  glowMaterial.depthTest = false;   
-  trailMaterial.depthTest = false;  
-  cursorGroup.renderOrder = 9999;   
-  trail.renderOrder = 9998;         
+  // Keep these very high to ensure they render after the scene elements
+  cursorGroup.renderOrder = 9999;
+  trail.renderOrder = 9998;
 
-  // --- REST OF FILE UNCHANGED ---
   dom.addEventListener('mousemove', (e) => {
     prevMouse.copy(mouse);
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     isMouseOver = true;
   });
-  
-  dom.addEventListener('mouseleave', () => {
-    isMouseOver = false;
-  });
 
   function activate() {
-    if (isVisible) return;
     isVisible = true;
     cursorGroup.visible = true;
     trail.visible = true;
@@ -125,13 +116,14 @@ export function setupCursor(scene, camera, renderer) {
     const dy = mouse.y - prevMouse.y;
     mouseVelocity = Math.hypot(dx, dy);
 
-    raycaster.setFromCamera(mouse, camera);
-    const textPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -800);
-    raycaster.ray.intersectPlane(textPlane, intersectPoint);
-    if (intersectPoint) {
-      cursorGroup.position.copy(intersectPoint);
-      cursorGroup.position.y += 10;
-    }
+    const currentZ = window.isStarted ? -800 : -500;
+    
+    targetPos.set(mouse.x, mouse.y, 0.5);
+    targetPos.unproject(camera);
+    targetPos.sub(camera.position).normalize();
+    
+    const distance = (currentZ - camera.position.z) / targetPos.z;
+    cursorGroup.position.copy(camera.position).add(targetPos.multiplyScalar(distance));
 
     if (mouseVelocity > 0.001) {
       const count = Math.min(Math.floor(mouseVelocity * 300), 12);
@@ -139,14 +131,14 @@ export function setupCursor(scene, camera, renderer) {
         if (trailParticles.length >= trailCount) break;
         trailParticles.push({
           pos: cursorGroup.position.clone().add(new THREE.Vector3(
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 15
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20
           )),
           life: 1.0,
           vel: new THREE.Vector3(
-            (Math.random() - 0.5) * 50,
-            (Math.random() - 0.5) * 50,
+            (Math.random() - 0.5) * 60,
+            (Math.random() - 0.5) * 60,
             (Math.random() - 0.5) * 20
           )
         });
@@ -163,22 +155,20 @@ export function setupCursor(scene, camera, renderer) {
       p.life -= 0.02;
       p.pos.addScaledVector(p.vel, 0.02);
       if (p.life > 0) {
-        posArray[idx * 3]     = p.pos.x;
+        posArray[idx * 3] = p.pos.x;
         posArray[idx * 3 + 1] = p.pos.y;
         posArray[idx * 3 + 2] = p.pos.z;
-        sizeArray[idx] = p.life * (6 + Math.random() * 8);
+        sizeArray[idx] = p.life * (15 + Math.random() * 20);
         alphaArray[idx] = p.life * 0.7;
         idx++;
       }
     }
     while (trailParticles.length && trailParticles[0].life <= 0) trailParticles.shift();
-    for (; idx < trailCount; idx++) {
-      sizeArray[idx] = alphaArray[idx] = 0;
-    }
+    
     trailGeometry.attributes.position.needsUpdate = true;
     trailGeometry.attributes.size.needsUpdate = true;
     trailGeometry.attributes.alpha.needsUpdate = true;
   }
 
-  return { update, activate };
+  return { update, activate, cursorGroup };
 }

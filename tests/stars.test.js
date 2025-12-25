@@ -8,7 +8,6 @@ describe('stars', () => {
   beforeEach(() => {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera();
-    // Clear the scene and ensure all global mocks are reset
     scene.clear();
     vi.restoreAllMocks();
   });
@@ -31,43 +30,41 @@ describe('stars', () => {
   });
 
   it('activates a meteor and assigns HSL colors after update cycles', () => {
-    // 1. Mock random BEFORE init so all 24 meteors get delay = 0
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
-    
     initShootingStars(scene, camera);
-    updateShootingStars(); // This should trigger resetMeteor immediately
+    updateShootingStars(); 
 
     const activeHead = scene.children.find(c => c instanceof THREE.Sprite && c.visible === true);
-    
     expect(activeHead).toBeDefined();
     
     const hsl = { h: 0, s: 0, l: 0 };
     activeHead.material.color.getHSL(hsl);
-    
-    // Since mock was 0, it should hit the "Fiery" HSL (0.1) path
     expect(Math.abs(hsl.h - 0.1)).toBeLessThan(0.05);
     
     randomSpy.mockRestore();
   });
 
   it('fades out the head sprite when isFading is triggered', () => {
-    // Force delay=0 and life=100
+    vi.useFakeTimers(); // Force time to be virtual
+    
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
     
     initShootingStars(scene, camera);
     updateShootingStars(); 
-
+  
     const activeHead = scene.children.find(c => c instanceof THREE.Sprite && c.visible === true);
     
-    // Advance 90 frames (starts fading at 80)
+    // Advance 95 frames instantly
     for (let i = 0; i < 95; i++) {
+      vi.advanceTimersByTime(16); // Simulate frame timing
       updateShootingStars();
     }
-
+  
     expect(activeHead.material.opacity).toBeLessThan(1.0);
     expect(activeHead.material.opacity).toBeGreaterThan(0);
     
     randomSpy.mockRestore();
+    vi.useRealTimers(); // Restore for other tests
   });
 
   it('rotates the static starfield very slowly', () => {
