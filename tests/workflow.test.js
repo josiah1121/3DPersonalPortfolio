@@ -37,7 +37,7 @@ describe('GitHub Actions Workflow', () => {
     it('runs linting before running tests', () => {
       const steps = config.jobs.test.steps.map(s => s.name || s.run);
       const lintIndex = steps.findIndex(s => s?.includes('Run linter'));
-      const testIndex = steps.findIndex(s => s?.includes('Run tests'));
+      const testIndex = steps.findIndex(s => s?.includes('Run Unit Tests'));
       
       expect(lintIndex).toBeLessThan(testIndex);
     });
