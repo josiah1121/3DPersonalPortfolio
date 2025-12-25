@@ -59,7 +59,7 @@ const skills = [
   { name: "DevOps", 
     color: 0xccaaff, 
     years: "CI/CD", 
-    description: "Architected robust pipelines for safety-critical embedded software, ensuring high-reliability deployments." 
+    description: "Architected robust pipelines for safety-critical embedded software, ensuring high-reliability deployments. Click below to simulate a live deployment sequence." 
   },
   { name: "Git", 
     color: 0xdddddd, 
