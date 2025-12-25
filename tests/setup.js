@@ -1,38 +1,85 @@
+// tests/setup.js
+import { vi } from 'vitest';
 import 'vitest-canvas-mock';
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 
-// Global THREE if needed
+// 1. Mock the HTTPS import for TWEEN
+vi.mock('https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23/dist/tween.esm.js', () => {
+  return {
+    default: {
+      Tween: class {
+        constructor(obj) { this.obj = obj; }
+        to() { return this; }
+        easing() { return this; }
+        yoyo() { return this; }
+        repeat() { return this; }
+        start() { return this; }
+        onComplete(cb) { if (cb) cb(); return this; }
+      },
+      Easing: {
+        Elastic: { Out: (n) => n },
+        Quadratic: { Out: (n) => n },
+        Linear: { None: (n) => n }
+      }
+    }
+  };
+});
+
 global.THREE = THREE;
 
-// Keep your FontLoader mock
+// 2. Fix "generateShapes" error by providing a minimal font mock
 FontLoader.prototype.load = (url, onLoad) => {
-  onLoad({});
+  onLoad({
+    generateShapes: () => [], // Returns empty array so TextGeometry doesn't crash
+    data: {}
+  });
 };
 
-// Keep your TextureLoader mock
 THREE.TextureLoader.prototype.load = () => new THREE.Texture();
 
-// Mock getImageData to return "fake" text pixels
+// 3. Complete Canvas Mock
 HTMLCanvasElement.prototype.getContext = function(type) {
-    const actualCtx = this.getContextOriginal ? this.getContextOriginal(type) : null;
+  const actualCtx = this.getContextOriginal ? this.getContextOriginal(type) : null;
+  
+  return {
+    ...actualCtx,
+    // Text & Measure
+    fillText: () => {},
+    measureText: () => ({ width: 100 }),
     
-    return {
-      ...actualCtx,
-      fillText: () => {},
-      measureText: () => ({ width: 100 }),
-      clearRect: () => {},
-      getImageData: (x, y, w, h) => {
-        const data = new Uint8ClampedArray(w * h * 4);
-        // Fill the buffer so that even with a step of 3, we find plenty of pixels
-        for (let i = 0; i < data.length; i += 4) {
-          data[i + 3] = 255; // Set Alpha to max for every pixel
-        }
-        return { data };
-      },
-      createRadialGradient: () => ({
-        addColorStop: () => {},
-      }),
-      fillRect: () => {},
-    };
+    // Rects & Clears
+    clearRect: () => {},
+    fillRect: () => {},
+    strokeRect: () => {}, // Added this to fix PersonalProject crash
+    
+    // Pathing
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    quadraticCurveTo: () => {},
+    closePath: () => {},
+
+    // Styling
+    shadowBlur: 0,
+    shadowColor: '',
+    globalAlpha: 1.0,
+    strokeStyle: '',
+    fillStyle: '',
+    lineWidth: 1,
+
+    // Gradients
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+
+    // Image Data
+    getImageData: (x, y, w, h) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < data.length; i += 4) data[i + 3] = 255; 
+      return { data };
+    },
   };
+};
