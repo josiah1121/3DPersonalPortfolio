@@ -1,4 +1,3 @@
-// main.js
 import * as THREE from 'three';
 import TWEEN from 'https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23/dist/tween.esm.js';
 
@@ -27,10 +26,7 @@ import { createLandingPage } from './src/landing.js';
 const { createParticles, updateParticles } = Particles;
 const { scene, camera, renderer, controls } = initScene();
 
-// 1. Setup Cursor
 const cursor = setupCursor(scene, camera, renderer);
-
-// --- MODIFICATION: ACTIVATE IMMEDIATELY ---
 cursor.activate();
 window.isStarted = false; 
 
@@ -39,7 +35,6 @@ window.isStarted = false;
 // ————————————————————————
 const landing = createLandingPage(scene, camera, () => {
   window.isStarted = true; 
-  
   document.body.style.cursor = 'none';
   
   createParticles(scene, "Josiah Clark", {
@@ -48,7 +43,6 @@ const landing = createLandingPage(scene, camera, () => {
     }
   });
 
-  // Reveal the world - with safety checks
   if (projectsArea) projectsArea.visible = true;
   if (tunnelGroup) tunnelGroup.visible = true;
   if (experienceArea) experienceArea.visible = true;
@@ -56,7 +50,7 @@ const landing = createLandingPage(scene, camera, () => {
 });
 
 // ————————————————————————
-// WORLD INITIALIZATION (Initially Hidden)
+// WORLD INITIALIZATION
 // ————————————————————————
 initShootingStars(scene, camera);
 initDust(scene, camera);
@@ -65,67 +59,59 @@ const player = createPlayer(scene);
 const projectsArea = createProjectsArea(scene);
 if (projectsArea) projectsArea.visible = false; 
 
-const billboardProjects = [];
-const radius = 1500;
-const height = 0;
-const zOffset = 1000;
-const numProjects = 5;
-const angleStep = Math.PI / (numProjects + 2);
+// --- LANDSCAPE OPTIMIZED PROJECT SETUP ---
+let billboardProjects = [];
+const projectConfigs = [
+  { title: "Baseball Team Manager App", description: "iOS app allowing users to schedule games, manage teams, and make data-driven decisions via player stats and analytics.", tech: ["Swift", "Xcode", "MongoDB", "TypeScript", "Firebase"], link: "github.com/josiah1121/baseball-app" },
+  { title: "Dynamic Island Ollama Client", description: "macOS app with a custom Dynamic Island widget for sending prompts to a local Llama 3 model via Ollama API.", tech: ["SwiftUI", "Xcode", "Ollama API"], link: "github.com/josiah1121/ollama-dynamic-island" },
+  { title: "Alexa Kroger Grocery Skill", description: "Voice-enabled Alexa skill using AWS and Kroger API to add items directly to your shopping cart.", tech: ["Python", "AWS Lambda", "Alexa SDK", "Kroger API"], link: "github.com/josiah1121/alexa-kroger" },
+  { title: "Web Scraper & Excel Exporter", description: "Python tool that scrapes web data and exports it to Excel for analysis or automated crawling.", tech: ["Python", "Requests", "BeautifulSoup", "pandas"], link: "github.com/josiah1121/web-scraper" },
+  { title: "Arduino Temperature Fan", description: "Proportional control fan on Arduino receiving temperature commands via serial communication.", tech: ["C++", "Arduino IDE", "Visual Studio"], link: "github.com/josiah1121/arduino-fan" }
+];
 
-function addProject(config, index) {
-  if (!projectsArea) return; // Prevent crash if projectsArea failed
-  const angle = (index - Math.floor(numProjects / 2)) * angleStep;
-  const x = Math.sin(angle) * radius;
-  const z = -Math.cos(angle) * radius + zOffset;
-  const position = new THREE.Vector3(x, height, z);
-  const proj = new PersonalProject(config, position, 1.0);
-  proj.addTo(projectsArea);
-  billboardProjects.push(proj);
+function rebuildProjects() {
+  if (!projectsArea) return;
+  
+  // Clean up existing projects
+  billboardProjects.forEach(p => projectsArea.remove(p.mesh || p.group || p)); 
+  billboardProjects = [];
+
+  const isLandscape = window.innerWidth > window.innerHeight;
+  const isSmallMobile = window.innerHeight < 500;
+
+  // Adaptive Math for Landscape
+  const radius = isLandscape ? 1800 : 1500; // Wider radius in landscape
+  const zOffset = isLandscape ? 1200 : 1000;
+  const angleStep = isLandscape ? Math.PI / 8 : Math.PI / 7;
+  const billboardScale = (isLandscape && isSmallMobile) ? 0.75 : 1.0;
+
+  projectConfigs.forEach((config, index) => {
+    const angle = (index - Math.floor(projectConfigs.length / 2)) * angleStep;
+    const x = Math.sin(angle) * radius;
+    const z = -Math.cos(angle) * radius + zOffset;
+    
+    const proj = new PersonalProject(config, new THREE.Vector3(x, 0, z), billboardScale);
+    proj.addTo(projectsArea);
+    billboardProjects.push(proj);
+  });
 }
 
-// Project Definitions
-addProject({
-  title: "Baseball Team Manager App",
-  description: "iOS app allowing users to schedule games, manage teams, and make data-driven decisions via player stats and analytics.",
-  tech: ["Swift", "Xcode", "MongoDB", "TypeScript", "Firebase"],
-  link: "github.com/josiah1121/baseball-app"
-}, 0);
-addProject({
-  title: "Dynamic Island Ollama Client",
-  description: "macOS app with a custom Dynamic Island widget for sending prompts to a local Llama 3 model via Ollama API.",
-  tech: ["SwiftUI", "Xcode", "Ollama API"],
-  link: "github.com/josiah1121/ollama-dynamic-island"
-}, 1);
-addProject({
-  title: "Alexa Kroger Grocery Skill",
-  description: "Voice-enabled Alexa skill using AWS and Kroger API to add items directly to your shopping cart.",
-  tech: ["Python", "AWS Lambda", "Alexa SDK", "Kroger API"],
-  link: "github.com/josiah1121/alexa-kroger"
-}, 2);
-addProject({
-  title: "Web Scraper & Excel Exporter",
-  description: "Python tool that scrapes web data and exports it to Excel for analysis or automated crawling.",
-  tech: ["Python", "Requests", "BeautifulSoup", "pandas"],
-  link: "github.com/josiah1121/web-scraper"
-}, 3);
-addProject({
-  title: "Arduino Temperature Fan",
-  description: "Proportional control fan on Arduino receiving temperature commands via serial communication.",
-  tech: ["C++", "Arduino IDE", "Visual Studio"],
-  link: "github.com/josiah1121/arduino-fan"
-}, 4);
+// Initial build
+rebuildProjects();
 
+// Handle Orientation/Resize Re-calculation
+window.addEventListener('resize', rebuildProjects);
+
+// --- OTHER AREAS ---
 const { tunnelGroup, updateNeonTunnel } = createNeonTunnel(scene);
 if (tunnelGroup) tunnelGroup.visible = false;
 
-// Initialize Skills with Safety
 const skillsArea = createSkillsArea(scene);
 if (skillsArea) {
   skillsArea.visible = false;
   createSkillsTitle(scene, skillsArea);
 }
 
-// Initialize Experience with Safety
 const experienceResults = createExperienceArea(scene, camera); 
 const experienceArea = experienceResults ? experienceResults.group : null;
 if (experienceArea) {
@@ -183,7 +169,6 @@ function animate() {
       experienceResults.infoCard.update();
     }
     
-    // Skills update safety
     if (skillsArea) {
       updateSkills(camera, cursorMouse);
       updateSkillsTitle(camera, delta);

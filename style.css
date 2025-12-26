@@ -1,12 +1,21 @@
 body {
   margin: 0;
+  /* position: fixed and width/height 100% prevent 'bounce' scrolling on mobile */
+  position: fixed; 
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: #000;
   font-family: 'Arial', sans-serif;
   cursor: none;
+  /* Prevents text selection during tap interactions */
+  user-select: none; 
+  -webkit-user-select: none;
 }
 
-canvas { display: block; }
+canvas { 
+  display: block; 
+}
 
 #landing-overlay {
   position: absolute;
@@ -17,28 +26,48 @@ canvas { display: block; }
   text-align: center;
   pointer-events: none;
   z-index: 100;
-  transition: opacity 1s, transform 1s;
+  transition: opacity 1s, transform 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+  /* Account for side notches on mobile landscape */
+  padding: 0 40px;
+  width: 90%;
+  max-width: 800px;
 }
 
 #landing-overlay h1 {
-  font-size: 2.5rem;
-  letter-spacing: 1.5rem;
+  font-size: clamp(1.2rem, 6vw, 2.5rem); /* Fluid typography based on screen width */
+  letter-spacing: clamp(0.5rem, 3vw, 1.5rem);
   font-weight: 300;
   text-transform: uppercase;
   margin: 0;
   color: #eefbff;
   text-shadow: 0 0 15px rgba(136, 204, 255, 0.5);
+  white-space: nowrap;
 }
 
 #landing-overlay p {
-  font-size: 0.8rem;
+  font-size: clamp(0.6rem, 2vw, 0.8rem);
   letter-spacing: 0.4rem;
   color: #88ccff;
   margin-top: 20px;
   opacity: 0.6;
+  text-transform: uppercase;
+}
+
+/* LANDSCAPE MOBILE OPTIMIZATION */
+@media (max-orientation: landscape) and (max-height: 500px) {
+  #landing-overlay {
+    /* Lower the margin-top if height is very tight */
+    gap: 10px;
+  }
+  #landing-overlay p {
+    margin-top: 10px;
+    letter-spacing: 0.2rem;
+  }
 }
 
 .fade-out {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(2);
+  pointer-events: none;
+  /* Faster scale for a more 'warpspeed' feel on entry */
+  transform: translate(-50%, -50%) scale(3);
 }
