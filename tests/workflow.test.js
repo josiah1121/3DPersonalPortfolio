@@ -24,18 +24,19 @@ describe('GitHub Actions Workflow', () => {
     });
 
     it('uses the correct Node.js version', () => {
-      const setupNodeStep = config.jobs.test.steps.find(step => step.uses?.includes('setup-node'));
-      expect(setupNodeStep.with['node-version']).toBe('20');
+            // Change .test. to .test-and-build.
+            const setupNodeStep = config.jobs['test-and-build'].steps.find(step => step.uses?.includes('setup-node'));
+            expect(setupNodeStep.with['node-version']).toBe('20');
     });
-
+  
     it('contains the necessary canvas dependencies for Vitest/JSDOM', () => {
-      const installDepsStep = config.jobs.test.steps.find(step => step.name === 'Install system dependencies');
-      expect(installDepsStep.run).toContain('libcairo2-dev');
-      expect(installDepsStep.run).toContain('libpango1.0-dev');
+        const installDepsStep = config.jobs['test-and-build'].steps.find(step => step.name === 'Install system dependencies (for vitest-canvas-mock)');
+        expect(installDepsStep.run).toContain('libcairo2-dev');
+        expect(installDepsStep.run).toContain('libpango1.0-dev');
     });
 
     it('runs linting before running tests', () => {
-      const steps = config.jobs.test.steps.map(s => s.name || s.run);
+      const steps = config.jobs['test-and-build'].steps.map(s => s.name || s.run);
       const lintIndex = steps.findIndex(s => s?.includes('Run linter'));
       const testIndex = steps.findIndex(s => s?.includes('Run Unit Tests'));
       

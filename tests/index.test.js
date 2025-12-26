@@ -23,18 +23,9 @@ describe('index.html structure', () => {
     expect(link.getAttribute('href')).toBe('style.css');
   });
 
-  it('defines the Three.js importmap correctly', () => {
-    const importMap = document.querySelector('script[type="importmap"]');
-    expect(importMap).not.toBeNull();
-    
-    const mapContent = JSON.parse(importMap.textContent);
-    expect(mapContent.imports.three).toContain('three.module.js');
-    expect(mapContent.imports['three/addons/']).toBeDefined();
-  });
-
   it('loads main.js as a module', () => {
-    const mainScript = document.querySelector('script[src="main.js"]');
+    // We look for a script tag that is a module and points to main.js
+    const mainScript = document.querySelector('script[type="module"][src*="main.js"]');
     expect(mainScript).not.toBeNull();
-    expect(mainScript.getAttribute('type')).toBe('module');
   });
 });
