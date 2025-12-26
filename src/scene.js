@@ -77,12 +77,26 @@ export function initScene() {
 
   // Resize handler
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const isLandscape = width > height;
+
+    camera.aspect = width / height;
     
-    // Re-verify pixel ratio on resize/orientation change
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Adjust FOV: Increase FOV slightly in landscape to see more of the "world"
+    // or keep it tight for cinematic feel.
+    camera.fov = isLandscape ? 50 : 60; 
+
+    // Adjust camera height/distance for landscape
+    if (isLandscape && height < 500) { // Small mobile landscape
+        camera.position.z = 2000; // Pull back so titles aren't cut off
+        camera.position.y = 400;  // Lower the camera slightly
+    } else {
+        camera.position.set(0, 550, 1600);
+    }
+
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
   });
 
   return { scene, camera, renderer, controls };
