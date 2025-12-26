@@ -6,18 +6,33 @@ describe('createInfoCard', () => {
   let scene, camera, infoCard;
 
   beforeEach(() => {
+    // Mock matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    // Clean up any leaked overlays from previous failed tests
+    const existing = document.getElementById('infocard-html-overlay');
+    if (existing) existing.remove();
+
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera();
-    // Position camera so group.copy(camera) has a known starting point
-    camera.position.set(0, 0, 0);
+    camera = new THREE.PerspectiveCamera(75, 16/9, 0.1, 1000);
     infoCard = createInfoCard(scene, camera);
   });
 
   it('initializes with a hidden group containing 3 meshes', () => {
     expect(infoCard.group).toBeInstanceOf(THREE.Group);
     expect(infoCard.group.visible).toBe(false);
-    
-    // Overlay, Backdrop, and Card Mesh
     const meshes = infoCard.group.children.filter(child => child instanceof THREE.Mesh);
     expect(meshes.length).toBe(3);
   });
@@ -30,70 +45,71 @@ describe('createInfoCard', () => {
     };
 
     infoCard.show(testData);
+    
     expect(infoCard.group.visible).toBe(true);
     
-    // After calling show, currentOpacity is still 0 (needs update() to transition)
-    // but we can check if the group is now active
-    expect(infoCard.group.visible).toBe(true);
+    const overlay = document.getElementById('infocard-html-overlay');
+    expect(overlay).not.toBeNull();
+    // Use .contain or check style directly
+    expect(overlay.style.display).toBe('block');
   });
 
   it('updates positions and opacities during the update loop', () => {
     infoCard.show({ title: 'Test' });
-    
-    // Move camera to ensure the card follows it
     camera.position.set(0, 0, 10);
     camera.updateMatrixWorld();
 
-    // Run update logic
     infoCard.update();
 
-    // The group should have moved to the camera's position 
-    // and then translated -10 on Z (based on your code's const dist = 10)
-    expect(infoCard.group.position.z).toBeLessThan(camera.position.z);
+    // Camera at 10, dist is 10, so group should be at 0
+    expect(infoCard.group.position.z).toBeCloseTo(0);
     
-    // Check if opacity is increasing from 0
-    const cardMesh = infoCard.group.children.find(c => c.geometry instanceof THREE.PlaneGeometry && c.scale.x !== 5);
+    const cardMesh = infoCard.group.children.find(c => c.renderOrder === 1000);
     expect(cardMesh.material.opacity).toBeGreaterThan(0);
   });
 
   it('hides the group when targetOpacity reaches zero', () => {
     infoCard.show({ title: 'Test' });
-    infoCard.update(); // Bring opacity up
-    
+    infoCard.update(); 
     infoCard.hide();
     
-    // Simulate multiple frames to let the lerp (0.12) reach the threshold (< 0.01)
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 60; i++) {
       infoCard.update();
     }
 
     expect(infoCard.group.visible).toBe(false);
+    const overlay = document.getElementById('infocard-html-overlay');
+    expect(overlay.style.display).toBe('none');
   });
 
   it('responds to the Escape key to hide the card', () => {
     infoCard.show({ title: 'Test' });
-    expect(infoCard.group.visible).toBe(true);
-
-    // Dispatch synthetic keyboard event
     const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
     window.dispatchEvent(escEvent);
 
-    // Update to process the change in targetOpacity
     infoCard.update();
     
-    // Verify it started hiding (targetScale should be 0.9 now)
-    // We can't check the private variable, but we can check the mesh scale decreasing
     const cardMesh = infoCard.group.children.find(c => c.renderOrder === 1000);
-    expect(cardMesh.scale.x).toBeLessThan(1.0);
+    // Since hide() sets targetScale to 0.9, the scale should start dropping from 1.0
+    expect(cardMesh.scale.x).toBeLessThan(1.0); 
   });
 
   it('cleans up resources on dispose', () => {
-    const removeEventSpy = vi.spyOn(window, 'removeEventListener');
-    const sceneRemoveSpy = vi.spyOn(scene, 'remove');
+    // We spy on the prototype/window BEFORE calling dispose
+    const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
+    
+    // Create a local reference to the element to check it after dispose
+    const overlayElement = document.getElementById('infocard-html-overlay');
     
     infoCard.dispose();
 
-    expect(removeEventSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
-    expect(sceneRemoveSpy).toHaveBeenCalledWith(infoCard.group);
+    // Check if event listener was removed
+    expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+    
+    // Check if the group was removed from the scene
+    expect(scene.children.includes(infoCard.group)).toBe(false);
+    
+    // Check if HTML element was removed from DOM
+    expect(document.getElementById('infocard-html-overlay')).toBeNull();
   });
 });

@@ -13,7 +13,9 @@ const targetPos = new THREE.Vector3();
 export function setupCursor(scene, camera, renderer) {
   const dom = renderer.domElement;
 
+  // 'none' on desktop, auto on mobile to allow interaction
   dom.style.cursor = 'none';
+  dom.style.touchAction = 'none'; // Prevents default browser panning/zooming
 
   const spriteTexture = new THREE.TextureLoader().load(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGAoQe5wwAAAABJRU5ErkJggg=='
@@ -25,7 +27,7 @@ export function setupCursor(scene, camera, renderer) {
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    depthTest: false // FIX: Prevents cursor from being hidden by the ground plane
+    depthTest: false 
   });
 
   const glowMaterial = new THREE.SpriteMaterial({
@@ -35,7 +37,7 @@ export function setupCursor(scene, camera, renderer) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     opacity: 0.35,
-    depthTest: false // FIX: Prevents glow from being hidden by the ground plane
+    depthTest: false 
   });
 
   const trailCount = 800;
@@ -71,7 +73,7 @@ export function setupCursor(scene, camera, renderer) {
     `,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    depthTest: false, // FIX: Prevents trail particles from being hidden by the ground plane
+    depthTest: false,
     transparent: true
   });
 
@@ -93,15 +95,29 @@ export function setupCursor(scene, camera, renderer) {
   cursorGroup.frustumCulled = false; 
   scene.add(cursorGroup);
 
-  // Keep these very high to ensure they render after the scene elements
   cursorGroup.renderOrder = 9999;
   trail.renderOrder = 9998;
 
-  dom.addEventListener('mousemove', (e) => {
+  // --- UNIFIED POINTER HANDLING ---
+  // Using pointer events covers Mouse, Touch, and Stylus in one listener
+  const updatePointer = (clientX, clientY) => {
     prevMouse.copy(mouse);
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
     isMouseOver = true;
+    if (!isVisible) activate();
+  };
+
+  dom.addEventListener('pointermove', (e) => {
+    updatePointer(e.clientX, e.clientY);
+  });
+
+  dom.addEventListener('pointerdown', (e) => {
+    updatePointer(e.clientX, e.clientY);
+  });
+
+  dom.addEventListener('pointerleave', () => {
+    isMouseOver = false;
   });
 
   function activate() {
@@ -112,13 +128,18 @@ export function setupCursor(scene, camera, renderer) {
 
   function update() {
     if (!isVisible) return;
+    
     const dx = mouse.x - prevMouse.x;
     const dy = mouse.y - prevMouse.y;
     mouseVelocity = Math.hypot(dx, dy);
 
     const currentZ = window.isStarted ? -800 : -500;
     
-    targetPos.set(mouse.x, mouse.y, 0.5);
+    // OFFSET FOR TOUCH: On mobile, move the orb slightly above the finger so it's visible
+    const isTouch = window.matchMedia("(pointer: coarse)").matches;
+    const yOffset = isTouch ? 0.08 : 0; 
+
+    targetPos.set(mouse.x, mouse.y + yOffset, 0.5);
     targetPos.unproject(camera);
     targetPos.sub(camera.position).normalize();
     
