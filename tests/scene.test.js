@@ -35,6 +35,21 @@ vi.mock('three/addons/controls/OrbitControls.js', () => {
 
 describe('Scene Initialization', () => {
   beforeEach(() => {
+    // FIX: Mock matchMedia to prevent "TypeError: window.matchMedia is not a function"
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
     document.body.innerHTML = '';
     window.innerWidth = 1920;
     window.innerHeight = 1080;
@@ -56,7 +71,7 @@ describe('Scene Initialization', () => {
   it('attaches a renderer to the document body', () => {
     initScene();
     const canvas = document.querySelector('canvas');
-    expect(canvas).toBeDefined();
+    expect(canvas).not.toBeNull();
   });
 
   it('creates an infinite ground plane and grid helper', () => {

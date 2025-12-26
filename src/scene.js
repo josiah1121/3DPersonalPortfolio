@@ -14,36 +14,49 @@ export function initScene() {
     window.innerWidth / window.innerHeight,
     0.1,
     20000
-  // far enough for the huge ground
   );
 
-  // This is the magic position — exactly what your screenshot uses
-  camera.position.set(0, 550, 1600);   // low and close-ish → makes text feel massive
+  // Magic position for cinematic feel
+  camera.position.set(0, 550, 1600);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    powerPreference: "high-performance" // Hint for mobile devices with dual GPUs
+  });
+  
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  
+  // MOBILE FIX: Cap pixel ratio. 3x+ on mobile will cause significant lag.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  
   document.body.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.rotateSpeed = 0.7;
+  
+  // MOBILE FIX: Adjust rotation speed for touch inputs
+  // Touch gestures cover less physical distance than a mouse move
+  const isTouch = window.matchMedia("(pointer: coarse)").matches;
+  controls.rotateSpeed = isTouch ? 0.5 : 0.7; 
+  
+  // Prevent the camera from going below the ground plane on mobile/desktop
+  controls.maxPolarAngle = Math.PI / 2; 
 
   // Look straight at the base of the text on the horizon
   controls.target.set(0, -70, -500);
   controls.update();
 
-  // Bonus: one-key recenter if you ever move the text
+  // Recenter handler
   window.recenterCameraOnText = () => {
     if (window.particleTextCenter) {
       controls.target.copy(window.particleTextCenter);
-      controls.target.y = -70; // keep it looking at the base
+      controls.target.y = -70;
       controls.update();
     }
   };
 
-  // Infinite ground — same look as before, just way bigger
+  // Infinite ground
   const groundGeometry = new THREE.PlaneGeometry(30000, 30000);
   const groundMaterial = new THREE.MeshBasicMaterial({
     color: 0x112233,
@@ -67,6 +80,9 @@ export function initScene() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Re-verify pixel ratio on resize/orientation change
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   });
 
   return { scene, camera, renderer, controls };

@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 
+// --- NEW MOCK: Resolve the landing.js dependency ---
+vi.mock('../src/landing.js', () => ({
+  createLandingPage: vi.fn((scene, camera, onEnter) => ({
+    update: vi.fn(),
+    cleanup: vi.fn(),
+    // We can manually trigger onEnter in tests if we want to simulate the user entering
+    triggerEnter: onEnter 
+  }))
+}));
+
 // 1. Mock all module dependencies to isolate the main.js logic
 vi.mock('../src/scene.js', () => ({
   initScene: vi.fn(() => ({
@@ -23,7 +33,7 @@ vi.mock('../src/cursor.js', () => ({
 vi.mock('../src/stars.js', () => ({ initShootingStars: vi.fn(), updateShootingStars: vi.fn() }));
 
 vi.mock('../src/particles.js', () => ({ 
-  default: { createParticles: vi.fn((s, t, cfg) => cfg.onComplete()), updateParticles: vi.fn() } 
+  default: { createParticles: vi.fn((s, t, cfg) => { if(cfg?.onComplete) cfg.onComplete(); }), updateParticles: vi.fn() } 
 }));
 
 vi.mock('../src/glowText.js', () => ({ createGlowText: vi.fn(), updateGlowText: vi.fn() }));
@@ -31,7 +41,11 @@ vi.mock('../src/player.js', () => ({ createPlayer: vi.fn(() => ({ update: vi.fn(
 vi.mock('../src/dust.js', () => ({ initDust: vi.fn(), updateDust: vi.fn() }));
 
 vi.mock('../src/projects.js', () => ({
-  createProjectsArea: vi.fn(() => new THREE.Group()),
+  createProjectsArea: vi.fn(() => {
+    const g = new THREE.Group();
+    g.visible = true; // Default to true so we can test main.js hiding it
+    return g;
+  }),
   updateTitleLetters: vi.fn(),
   PersonalProject: vi.fn().mockImplementation(function() {
     return {
@@ -49,7 +63,7 @@ vi.mock('../src/experience.js', () => ({
 }));
 
 vi.mock('../src/skills.js', () => ({
-  createSkillsArea: vi.fn(),
+  createSkillsArea: vi.fn(() => new THREE.Group()),
   updateSkills: vi.fn(),
   setOrbitControls: vi.fn(),
   setInfoCard: vi.fn()
@@ -62,17 +76,30 @@ vi.mock('../src/neonTunnel.js', () => ({
   createNeonTunnel: vi.fn(() => ({ tunnelGroup: new THREE.Group(), updateNeonTunnel: vi.fn() })) 
 }));
 
+// Mock the CDN import specifically
 vi.mock('https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@23/dist/tween.esm.js', () => ({
-  default: { update: vi.fn() }
+  default: { 
+    update: vi.fn(),
+    Tween: vi.fn(() => ({
+      to: vi.fn().mockReturnThis(),
+      easing: vi.fn().mockReturnThis(),
+      onUpdate: vi.fn().mockReturnThis(),
+      start: vi.fn().mockReturnThis()
+    }))
+  }
 }));
 
 describe('Main Application Entry', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetModules(); 
-    // CRITICAL FIX: Clear call history so PersonalProject counts start at 0 for every test
     vi.clearAllMocks(); 
+    
+    // Mock requestAnimationFrame to prevent it from hanging or erroring in JSDOM
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => setTimeout(cb, 16));
+    
+    // Setup body for overlay checks
+    document.body.innerHTML = '<div id="landing-overlay"></div>';
   });
 
   afterEach(() => {
@@ -86,18 +113,26 @@ describe('Main Application Entry', () => {
     expect(window.requestAnimationFrame).toHaveBeenCalled();
   });
 
+  it('initially hides world areas before landing is completed', async () => {
+    const { createProjectsArea } = await import('../src/projects.js');
+    await import('../main.js');
+    
+    const projectsGroup = vi.mocked(createProjectsArea).mock.results[0].value;
+    expect(projectsGroup.visible).toBe(false);
+    expect(window.isStarted).toBe(false);
+  });
+
   it('calculates the tight arc positions for the 5 projects', async () => {
     const { PersonalProject } = await import('../src/projects.js');
     await import('../main.js');
 
-    // This will now correctly expect 5 instead of accumulating from previous tests
     expect(PersonalProject).toHaveBeenCalledTimes(5);
 
     const firstProjectCall = vi.mocked(PersonalProject).mock.calls[0];
     const positionArg = firstProjectCall[1]; 
 
+    // radius is 1500, zOffset is 1000. Expected z ~ -cos(angle)*1500 + 1000
     expect(positionArg.z).toBeLessThanOrEqual(1000); 
-    expect(Math.abs(positionArg.x)).toBeGreaterThanOrEqual(0); 
   });
 
   it('sets up global pointer event listeners for experience interaction', async () => {
