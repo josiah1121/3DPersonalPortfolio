@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { mouse, isMouseOver } from './cursor.js'; // ← this is the key!
 
+export { particleTexture };
+
 // Helper function to generate a sharp circular particle texture
 function generateParticleTexture() {
   const size = 64;

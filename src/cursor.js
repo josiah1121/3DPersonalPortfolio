@@ -1,23 +1,19 @@
-// src/cursor.js — YOUR ORIGINAL CODE + ONLY 4 LINES ADDED
 import * as THREE from 'three';
 
 export const mouse = new THREE.Vector2();
-export let isMouseOver = false;   // ← ADD THIS LINE
+export let isMouseOver = false;
 let prevMouse = new THREE.Vector2();
 let mouseVelocity = 0;
 let isVisible = false;
 let trailParticles = [];
 
-// ADD THESE 4 LINES — this is all we need
-const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const intersectPoint = new THREE.Vector3();
+// Re-usable vector for calculations
+const targetPos = new THREE.Vector3();
 
 export function setupCursor(scene, camera, renderer) {
   const dom = renderer.domElement;
-  dom.style.cursor = 'none';
 
-  console.log('Minimal light cursor ready (will appear after text forms)');
+  dom.style.cursor = 'none';
 
   const spriteTexture = new THREE.TextureLoader().load(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGAoQe5wwAAAABJRU5ErkJggg=='
@@ -25,34 +21,23 @@ export function setupCursor(scene, camera, renderer) {
 
   const cursorMaterial = new THREE.SpriteMaterial({
     map: spriteTexture,
-    color: 0xffffff,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-
-  const cursorOrb = new THREE.Sprite(cursorMaterial);
-  cursorOrb.scale.set(12, 12, 1);
-
-  const glowMaterial = new THREE.SpriteMaterial({
-    map: spriteTexture,
-    color: 0xffddaa,
+    color: 0x00ffff, 
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    opacity: 0.25
+    depthTest: false // FIX: Prevents cursor from being hidden by the ground plane
   });
 
-  const glow = new THREE.Sprite(glowMaterial);
-  glow.scale.set(60, 60, 1);
+  const glowMaterial = new THREE.SpriteMaterial({
+    map: spriteTexture,
+    color: 0x4488ff,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.35,
+    depthTest: false // FIX: Prevents glow from being hidden by the ground plane
+  });
 
-  const cursorGroup = new THREE.Group();
-  cursorGroup.add(cursorOrb);
-  cursorGroup.add(glow);
-  cursorGroup.visible = false;
-  scene.add(cursorGroup);
-
-  // YOUR ORIGINAL TRAIL — 100% UNTOUCHED
   const trailCount = 800;
   const trailGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(trailCount * 3).fill(0);
@@ -64,7 +49,7 @@ export function setupCursor(scene, camera, renderer) {
   trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
 
   const trailMaterial = new THREE.ShaderMaterial({
-    uniforms: { color: { value: new THREE.Color(0xffaa77) } },
+    uniforms: { color: { value: new THREE.Color(0x88ccff) } },
     vertexShader: `
       attribute float size;
       attribute float alpha;
@@ -72,7 +57,7 @@ export function setupCursor(scene, camera, renderer) {
       void main() {
         vAlpha = alpha;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (300.0 / -mvPosition.z);
+        gl_PointSize = size * (400.0 / -mvPosition.z);
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
@@ -86,63 +71,74 @@ export function setupCursor(scene, camera, renderer) {
     `,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    depthTest: false, // FIX: Prevents trail particles from being hidden by the ground plane
     transparent: true
   });
 
   const trail = new THREE.Points(trailGeometry, trailMaterial);
   trail.visible = false;
+  trail.frustumCulled = false; 
   scene.add(trail);
+
+  const cursorOrb = new THREE.Sprite(cursorMaterial);
+  cursorOrb.scale.set(22, 22, 1);
+
+  const glow = new THREE.Sprite(glowMaterial);
+  glow.scale.set(100, 100, 1);
+
+  const cursorGroup = new THREE.Group();
+  cursorGroup.add(cursorOrb);
+  cursorGroup.add(glow);
+  cursorGroup.visible = false;
+  cursorGroup.frustumCulled = false; 
+  scene.add(cursorGroup);
+
+  // Keep these very high to ensure they render after the scene elements
+  cursorGroup.renderOrder = 9999;
+  trail.renderOrder = 9998;
 
   dom.addEventListener('mousemove', (e) => {
     prevMouse.copy(mouse);
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  
-    isMouseOver = true;        // ← ADD THIS
-  });
-  
-  dom.addEventListener('mouseleave', () => {
-    isMouseOver = false;       // ← ADD THIS
+    isMouseOver = true;
   });
 
   function activate() {
-    if (isVisible) return;
     isVisible = true;
     cursorGroup.visible = true;
     trail.visible = true;
-    console.log('Minimal light cursor activated');
   }
 
   function update() {
     if (!isVisible) return;
-
     const dx = mouse.x - prevMouse.x;
     const dy = mouse.y - prevMouse.y;
     mouseVelocity = Math.hypot(dx, dy);
 
-    raycaster.setFromCamera(mouse, camera);
-    const textPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -800);
-    raycaster.ray.intersectPlane(textPlane, intersectPoint);
-    if (intersectPoint) {
-      cursorGroup.position.copy(intersectPoint);
-      cursorGroup.position.y += 10; // match your groundY = 10
-    }
+    const currentZ = window.isStarted ? -800 : -500;
+    
+    targetPos.set(mouse.x, mouse.y, 0.5);
+    targetPos.unproject(camera);
+    targetPos.sub(camera.position).normalize();
+    
+    const distance = (currentZ - camera.position.z) / targetPos.z;
+    cursorGroup.position.copy(camera.position).add(targetPos.multiplyScalar(distance));
 
-    // YOUR ORIGINAL TRAIL CODE — COMPLETELY UNTOUCHED BELOW
     if (mouseVelocity > 0.001) {
       const count = Math.min(Math.floor(mouseVelocity * 300), 12);
       for (let i = 0; i < count; i++) {
         if (trailParticles.length >= trailCount) break;
         trailParticles.push({
           pos: cursorGroup.position.clone().add(new THREE.Vector3(
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 15,
-            (Math.random() - 0.5) * 15
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20
           )),
           life: 1.0,
           vel: new THREE.Vector3(
-            (Math.random() - 0.5) * 50,
-            (Math.random() - 0.5) * 50,
+            (Math.random() - 0.5) * 60,
+            (Math.random() - 0.5) * 60,
             (Math.random() - 0.5) * 20
           )
         });
@@ -158,27 +154,21 @@ export function setupCursor(scene, camera, renderer) {
       const p = trailParticles[i];
       p.life -= 0.02;
       p.pos.addScaledVector(p.vel, 0.02);
-
       if (p.life > 0) {
-        posArray[idx * 3]     = p.pos.x;
+        posArray[idx * 3] = p.pos.x;
         posArray[idx * 3 + 1] = p.pos.y;
         posArray[idx * 3 + 2] = p.pos.z;
-        sizeArray[idx] = p.life * (6 + Math.random() * 8);
+        sizeArray[idx] = p.life * (15 + Math.random() * 20);
         alphaArray[idx] = p.life * 0.7;
         idx++;
       }
     }
-
     while (trailParticles.length && trailParticles[0].life <= 0) trailParticles.shift();
-
-    for (; idx < trailCount; idx++) {
-      sizeArray[idx] = alphaArray[idx] = 0;
-    }
-
+    
     trailGeometry.attributes.position.needsUpdate = true;
     trailGeometry.attributes.size.needsUpdate = true;
     trailGeometry.attributes.alpha.needsUpdate = true;
   }
 
-  return { update, activate };
+  return { update, activate, cursorGroup };
 }

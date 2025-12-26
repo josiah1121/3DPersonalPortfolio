@@ -1,11 +1,44 @@
-/* style.css */ 
 body {
-    margin: 0;
-    overflow: hidden;
-    background: #000;
-    cursor: none;
-  }
-  
-  canvas {
-    display: block;
-  }
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Arial', sans-serif;
+  cursor: none;
+}
+
+canvas { display: block; }
+
+#landing-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  text-align: center;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 1s, transform 1s;
+}
+
+#landing-overlay h1 {
+  font-size: 2.5rem;
+  letter-spacing: 1.5rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  margin: 0;
+  color: #eefbff;
+  text-shadow: 0 0 15px rgba(136, 204, 255, 0.5);
+}
+
+#landing-overlay p {
+  font-size: 0.8rem;
+  letter-spacing: 0.4rem;
+  color: #88ccff;
+  margin-top: 20px;
+  opacity: 0.6;
+}
+
+.fade-out {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(2);
+}
