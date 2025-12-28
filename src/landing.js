@@ -5,19 +5,16 @@ export function createLandingPage(scene, camera, onEnter) {
   const group = new THREE.Group();
   scene.add(group);
 
-  // ENSURE THESE ARE INSIDE THE FUNCTION
   const isTouch = window.matchMedia("(pointer: coarse)").matches;
   const isSmallScreen = window.innerWidth < 600;
-  const mobileScale = (isTouch || isSmallScreen) ? 0.6 : 1.0;
+  
+  const mobileScale = (isTouch || isSmallScreen) ?  3.0 : 1.0;
 
   if (!isTouch) document.body.style.cursor = 'none';
   group.scale.set(mobileScale, mobileScale, mobileScale);
 
   let rotationMultiplier = 1;
   let isEntering = false; 
-
-  // Apply initial scale based on detected environment
-  group.scale.set(mobileScale, mobileScale, mobileScale);
 
   const createArc = (radius, start, end, color, opacity = 0.6) => {
     const points = [];
@@ -47,7 +44,11 @@ export function createLandingPage(scene, camera, onEnter) {
   shield.name = "portal_trigger";
 
   group.add(layer1, layer2, layer3, layer4, dots, shield);
-  group.position.set(0, 0, -500);
+
+  // 2. POSITION ADJUSTMENT:
+  // Move it slightly closer on mobile (-400 instead of -500) to combat perspective shrinkage
+  const zPos = (isTouch || isSmallScreen) ? -400 : -500;
+  group.position.set(0, 0, zPos);
 
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -109,7 +110,8 @@ export function createLandingPage(scene, camera, onEnter) {
       
       if (hit.length > 0) {
         triggerActivation();
-        startTransition();
+        // Short delay on mobile so the user sees the "activation" before the zoom
+        setTimeout(startTransition, 150); 
       }
     } else {
       if (isHovered) startTransition();
@@ -121,7 +123,7 @@ export function createLandingPage(scene, camera, onEnter) {
     const overlay = document.getElementById('landing-overlay');
     if (overlay) overlay.classList.add('fade-out');
 
-    new TWEEN.Tween(group.scale).to({ x: 15, y: 15, z: 15 }, 1500).easing(TWEEN.Easing.Exponential.In).start();
+    new TWEEN.Tween(group.scale).to({ x: 20, y: 20, z: 20 }, 1500).easing(TWEEN.Easing.Exponential.In).start();
     new TWEEN.Tween(group.rotation).to({ z: Math.PI * 4 }, 1500).easing(TWEEN.Easing.Quadratic.In).start();
     
     group.children.forEach(child => {

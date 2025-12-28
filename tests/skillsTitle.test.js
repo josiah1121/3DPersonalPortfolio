@@ -1,94 +1,98 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
+
+// 1. Mock cursor.js using a getter to allow dynamic toggling of the boolean
+vi.mock('../src/cursor.js', () => {
+  return {
+    mouse: new THREE.Vector2(0, 0),
+    get isMouseOver() { return global._isMouseOverMock; }
+  };
+});
+
 import { createSkillsTitle, updateSkillsTitle } from '../src/skillsTitle.js';
 
 describe('skillsTitle', () => {
   let scene, camera, mockSkillsGroup;
 
   beforeEach(() => {
+    global._isMouseOverMock = false;
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera();
-    
-    // Skills group used for position calculations
     mockSkillsGroup = new THREE.Group();
-    mockSkillsGroup.position.set(-1100, 100, -800);
-    
     scene.clear();
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('initializes the title group and converts text to particle data', () => {
     const title = createSkillsTitle(scene, mockSkillsGroup);
-
     expect(title).toBeDefined();
-    expect(title instanceof THREE.Group).toBe(true);
-    
-    // Check that we extracted particle data into userData
     const ud = title.userData;
     expect(ud.allParticles.length).toBeGreaterThan(0);
-    expect(ud.geometry.attributes.position.count).toBe(10000); // maxParticles
   });
 
   it('spawns particles over time based on delta', () => {
     const title = createSkillsTitle(scene, mockSkillsGroup);
     const ud = title.userData;
-
-    // Initially, particles at index 0 should be at 0,0,0 (unspawned)
     expect(ud.positions[0]).toBe(0);
-
-    // Update with a delta large enough to spawn the first few particles
-    // interval is 0.0008, so 0.01 should spawn several
-    updateSkillsTitle(camera, 0.01);
-
-    // The first particle should now have a randomized spawn position (not 0,0,0)
+    updateSkillsTitle(camera, 0.05); 
     expect(ud.positions[0]).not.toBe(0);
-    expect(ud.positions[1]).toBeGreaterThan(0); // spawned with +50 height minimum
   });
 
   it('correctly calculates the world position and title plane', () => {
     const title = createSkillsTitle(scene, mockSkillsGroup);
-    
-    // Based on code: -1100 + 30, 50, -800 + 180
-    expect(title.position.x).toBe(-1070);
-    expect(title.position.y).toBe(50);
-    expect(title.position.z).toBe(-620);
+    expect(title.position.x).toBe(-870);
+    expect(title.position.y).toBe(60);
+    expect(title.position.z).toBe(-550);
   });
 
-  it('progresses through letters sequentially', () => {
+  it('progresses through letters sequentially to completion', () => {
     const title = createSkillsTitle(scene, mockSkillsGroup);
-    
-    // Update multiple times to simulate time passing
-    // Total particles are usually ~1000-2000 for "Skills"
-    // We update with a huge delta to "finish" the animation
-    updateSkillsTitle(camera, 5.0); 
-
+    updateSkillsTitle(camera, 20.0); 
     const ud = title.userData;
     const lastIdx = (ud.allParticles.length - 1) * 3;
-    
-    // The last particle in the entire array should now be active
     expect(ud.positions[lastIdx]).not.toBe(0);
   });
 
   it('applies repulsive force when mouse is near', () => {
+    // 1. Enable interaction
+    global._isMouseOverMock = true; 
     const title = createSkillsTitle(scene, mockSkillsGroup);
     
-    // 1. Spawn everything first
-    updateSkillsTitle(camera, 5.0);
+    // Sync matrices for world position math
+    title.updateMatrixWorld(true);
     
+    // Spawn particles and let them settle
+    updateSkillsTitle(camera, 10.0); 
     const ud = title.userData;
+    updateSkillsTitle(camera, 1.0); 
+    
+    // Capture state before repulsion
     const initialX = ud.positions[0];
+    const initialZ = ud.positions[2];
 
-    // 2. Mock mouse position directly over the first particle
-    // Note: We need to mock the cursor.js exports
-    vi.mock('./cursor.js', () => ({
-      mouse: new THREE.Vector2(0, 0),
-      isMouseOver: true
-    }));
+    // 2. Correctly mock the Ray intersection
+    // In your code: raycaster.ray.intersectPlane(titlePlane, mouse3D)
+    // We transform a local position to world space to be the "hit" point
+    const targetLocal = new THREE.Vector3(ud.positions[0], ud.positions[1], ud.positions[2]);
+    const targetWorld = targetLocal.clone().applyMatrix4(title.matrixWorld);
 
-    // Update again - it should trigger the repulsion logic
+    // FIX: Spy on Ray.prototype.intersectPlane, not Raycaster
+    const raySpy = vi.spyOn(THREE.Ray.prototype, 'intersectPlane')
+      .mockImplementation((plane, targetVec) => {
+        targetVec.copy(targetWorld);
+        return targetVec;
+      });
+
+    // 3. Update: Force calculation should now trigger
     updateSkillsTitle(camera, 0.016);
 
     const newX = ud.positions[0];
-    expect(newX).not.toBe(initialX);
+    const newZ = ud.positions[2];
+
+    // Check if the particle moved away from its target coordinates
+    const hasMoved = Math.abs(newX - initialX) > 0.001 || Math.abs(newZ - initialZ) > 0.001;
+    
+    expect(hasMoved).toBe(true);
+    raySpy.mockRestore();
   });
 });

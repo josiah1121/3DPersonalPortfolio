@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { initScene } from '../src/scene.js';
 
-// 1. Mock WebGLRenderer using a standard function so it works with 'new'
+// 1. Mock WebGLRenderer
 vi.mock('three', async () => {
   const actual = await vi.importActual('three');
   return {
@@ -18,7 +18,7 @@ vi.mock('three', async () => {
   };
 });
 
-// 2. Mock OrbitControls similarly
+// 2. Mock OrbitControls
 vi.mock('three/addons/controls/OrbitControls.js', () => {
   return {
     OrbitControls: vi.fn().mockImplementation(function() {
@@ -35,7 +35,6 @@ vi.mock('three/addons/controls/OrbitControls.js', () => {
 
 describe('Scene Initialization', () => {
   beforeEach(() => {
-    // FIX: Mock matchMedia to prevent "TypeError: window.matchMedia is not a function"
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation(query => ({
@@ -51,6 +50,7 @@ describe('Scene Initialization', () => {
     });
 
     document.body.innerHTML = '';
+    // Set typical Desktop resolution
     window.innerWidth = 1920;
     window.innerHeight = 1080;
     vi.clearAllMocks();
@@ -64,8 +64,14 @@ describe('Scene Initialization', () => {
 
   it('configures the camera with the cinematic starting position', () => {
     const { camera } = initScene();
-    expect(camera.position.y).toBe(550);
-    expect(camera.position.z).toBe(1600);
+    
+    // Updated to match source code changes: camera.position.set(0, 650, 2200);
+    expect(camera.position.x).toBe(0);
+    expect(camera.position.y).toBe(650);
+    expect(camera.position.z).toBe(2200);
+    
+    // Updated to match source code FOV logic for desktop landscape (45)
+    expect(camera.fov).toBe(45);
   });
 
   it('attaches a renderer to the document body', () => {

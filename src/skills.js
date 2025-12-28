@@ -106,18 +106,19 @@ function createGridDome() {
 
 export function createSkillsArea(scene) {
   skillsGroup = new THREE.Group();
-  skillsGroup.position.set(-1100, 400, -800);
+  // Move slightly closer to center and lower Y to remain prominent in the new FOV
+  skillsGroup.position.set(-900, 350, -800); 
   if (scene) scene.add(skillsGroup);
 
   skillsGroup.add(createGridDome());
 
-  const groundRing = new THREE.Mesh(new THREE.RingGeometry(domeRadius * 0.95, domeRadius * 1.05, 72, 1), new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+  const groundRing = new THREE.Mesh(new THREE.RingGeometry(domeRadius * 0.95, domeRadius * 1.05, 72, 1), new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
   groundRing.rotation.x = -Math.PI / 2;
   groundRing.position.y = -domeRadius + 5;
-  groundRing.userData = { isGroundRing: true, baseOpacity: 0.45, baseScale: 1.0 };
+  groundRing.userData = { isGroundRing: true, baseOpacity: 0.5, baseScale: 1.0 };
   skillsGroup.add(groundRing);
 
-  const innerGlow = new THREE.Mesh(new THREE.RingGeometry(domeRadius * 0.7, domeRadius * 0.85, 64), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+  const innerGlow = new THREE.Mesh(new THREE.RingGeometry(domeRadius * 0.7, domeRadius * 0.85, 64), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
   innerGlow.rotation.x = -Math.PI / 2;
   innerGlow.position.y = groundRing.position.y;
   skillsGroup.add(innerGlow);
@@ -134,7 +135,8 @@ export function createSkillsArea(scene) {
     upwardPositions[i * 3] = Math.cos(angle) * radius;
     upwardPositions[i * 3 + 1] = baseY + Math.random() * 50;
     upwardPositions[i * 3 + 2] = Math.sin(angle) * radius;
-    upwardSizes[i] = 8 + Math.random() * 14;
+    // INCREASED SIZE: From 8-14 to 16-28 for visibility at distance
+    upwardSizes[i] = 16 + Math.random() * 12; 
     upwardAlphas[i] = Math.random();
     upwardSpeeds[i] = 25 + Math.random() * 40;
   }
@@ -146,7 +148,7 @@ export function createSkillsArea(scene) {
 
   const upwardLights = new THREE.Points(upwardGeometry, new THREE.ShaderMaterial({
     uniforms: { color: { value: new THREE.Color(0x80ff80) }, pointTexture: { value: particleTexture } },
-    vertexShader: `attribute float size; attribute float alpha; varying float vAlpha; void main() { vAlpha = alpha; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`,
+    vertexShader: `attribute float size; attribute float alpha; varying float vAlpha; void main() { vAlpha = alpha; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (400.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`,
     fragmentShader: `uniform vec3 color; uniform sampler2D pointTexture; varying float vAlpha; void main() { vec4 texColor = texture2D(pointTexture, gl_PointCoord); gl_FragColor = vec4(color, texColor.a * vAlpha); }`,
     blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
   }));
@@ -165,12 +167,14 @@ export function createSkillsArea(scene) {
       cloudPositions[j * 3] = r * Math.sin(phi) * Math.cos(theta);
       cloudPositions[j * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       cloudPositions[j * 3 + 2] = r * Math.cos(phi);
-      cloudSizes[j] = 6 + Math.random() * 8;
+      // INCREASED SIZE: From 6-8 to 10-14
+      cloudSizes[j] = 10 + Math.random() * 4;
     }
 
     const cloudMaterial = new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color(skill.color) }, uOpacity: { value: 0.6 }, pointTexture: { value: particleTexture } },
-      vertexShader: `attribute float size; void main() { vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`,
+      // INCREASED OPACITY: From 0.6 to 0.8
+      uniforms: { color: { value: new THREE.Color(skill.color) }, uOpacity: { value: 0.8 }, pointTexture: { value: particleTexture } },
+      vertexShader: `attribute float size; void main() { vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (400.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`,
       fragmentShader: `uniform vec3 color; uniform float uOpacity; uniform sampler2D pointTexture; void main() { vec4 texColor = texture2D(pointTexture, gl_PointCoord); gl_FragColor = vec4(color, uOpacity) * texColor; }`,
       blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
     });
@@ -194,7 +198,8 @@ export function createSkillsArea(scene) {
     }
     const textGeo = new THREE.BufferGeometry();
     textGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(textPos), 3));
-    textGeo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(textPos.length / 3).fill(7), 1));
+    // INCREASED SIZE: From 7 to 12
+    textGeo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(textPos.length / 3).fill(12), 1));
     const textMaterial = cloudMaterial.clone();
     textMaterial.uniforms.color.value.set(0xffffff);
     textMaterial.uniforms.uOpacity.value = 1.0;
@@ -202,10 +207,10 @@ export function createSkillsArea(scene) {
     textParticles.userData.billboard = true;
     orbGroup.add(textParticles);
 
-    const glowHalo = new THREE.Mesh(new THREE.SphereGeometry(95, 32, 16), new THREE.MeshBasicMaterial({ color: skill.color, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, side: THREE.BackSide }));
+    const glowHalo = new THREE.Mesh(new THREE.SphereGeometry(95, 32, 16), new THREE.MeshBasicMaterial({ color: skill.color, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, side: THREE.BackSide }));
     orbGroup.add(glowHalo);
 
-    orbGroup.userData = { skillData: skill, cloud: orbGroup.children[0], textParticles, glowHalo, cloudMaterial, textMaterial, baseOpacity: 0.6, hoverOpacity: 1.2, baseScale: 1.0, hoverScale: 1.3, timeOffset: Math.random() * Math.PI * 2, velocities: new Float32Array(cloudParticles * 3), homePositions: cloudPositions.slice(), originalOrbitalPos: orbGroup.position.clone(), currentVelocity: new THREE.Vector3() };
+    orbGroup.userData = { skillData: skill, cloud: orbGroup.children[0], textParticles, glowHalo, cloudMaterial, textMaterial, baseOpacity: 0.8, hoverOpacity: 1.4, baseScale: 1.0, hoverScale: 1.3, timeOffset: Math.random() * Math.PI * 2, velocities: new Float32Array(cloudParticles * 3), homePositions: cloudPositions.slice(), originalOrbitalPos: orbGroup.position.clone(), currentVelocity: new THREE.Vector3() };
     skillsGroup.add(orbGroup);
   });
 

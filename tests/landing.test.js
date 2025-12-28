@@ -9,11 +9,9 @@ describe('Landing Page Component', () => {
     document.body.innerHTML = '<div id="landing-overlay"></div>';
     document.body.style.cursor = 'default';
     
-    // Set a default desktop width
     window.innerWidth = 1024;
     window.innerHeight = 768;
 
-    // Comprehensive matchMedia mock
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
@@ -38,6 +36,7 @@ describe('Landing Page Component', () => {
   afterEach(() => {
     if (landingInstance && landingInstance.cleanup) landingInstance.cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers(); // Ensure real timers are restored after each test
   });
 
   it('initializes and adds a group with desktop scale', () => {
@@ -49,11 +48,9 @@ describe('Landing Page Component', () => {
     expect(document.body.style.cursor).toBe('none');
   });
 
-  it('initializes with a smaller scale on mobile screen width', () => {
-    // 1. Mock small screen width
+  it('initializes with the updated larger scale on mobile', () => {
+    // Mock small screen and touch
     window.innerWidth = 375;
-    
-    // 2. Mock touch capability
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
@@ -66,11 +63,13 @@ describe('Landing Page Component', () => {
     landingInstance = createLandingPage(scene, camera, onEnter);
     const group = scene.children.find(child => child instanceof THREE.Group);
     
-    expect(group.scale.x).toBeCloseTo(0.6); 
+    // Updated to match your new 3.0 scale requirement
+    expect(group.scale.x).toBe(3.0); 
+    expect(group.position.z).toBe(-400); // Check depth as well
     expect(document.body.style.cursor).not.toBe('none');
   });
 
-  it('triggers onEnter immediately on mobile tap', async () => {
+  it('triggers onEnter after the mobile delay on tap', async () => {
     vi.useFakeTimers();
     window.innerWidth = 375;
     window.matchMedia = vi.fn().mockReturnValue({ matches: true });
@@ -81,18 +80,23 @@ describe('Landing Page Component', () => {
 
     vi.spyOn(THREE.Raycaster.prototype, 'intersectObject').mockReturnValue([{ object: trigger }]);
 
-    // Manually define clientX/Y on event for JSDOM compatibility
     const event = new Event('pointerdown');
     Object.defineProperty(event, 'clientX', { value: 500 });
     Object.defineProperty(event, 'clientY', { value: 500 });
     window.dispatchEvent(event);
 
     const overlay = document.getElementById('landing-overlay');
+
+    // 1. Initially, it shouldn't have triggered the transition yet due to the delay
+    expect(overlay.classList.contains('fade-out')).toBe(false);
+
+    // 2. Advance past the 150ms mobile transition delay
+    vi.advanceTimersByTime(151);
     expect(overlay.classList.contains('fade-out')).toBe(true);
 
+    // 3. Advance through the animation duration
     vi.advanceTimersByTime(1500);
     expect(onEnter).toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
   it('cleans up event listeners on dispose', () => {
