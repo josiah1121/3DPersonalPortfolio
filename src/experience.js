@@ -1,6 +1,7 @@
 // src/experience.js — Precision Hitboxes & High-Vibrancy
 import * as THREE from 'three';
 import { createInfoCard } from './components/infoCard.js';
+import { setSkillsDimming } from './skills.js';
 
 let expGroup = null;
 let billboardOrbs = [];
@@ -366,6 +367,7 @@ export function updateExperience(camera, mouseVec) {
   // Dim background when hovering
   if (sceneRef) {
     currentDimLevel += ((hoveredOrb ? 0.1 : 1.0) - currentDimLevel) * 0.1;
+    setSkillsDimming(currentDimLevel);
     sceneRef.traverse(child => {
       if (child.isMesh && !expGroup.getObjectById(child.id) && !child.userData.isTextOverlay) {
         if (!child.userData.baseOp) child.userData.baseOp = child.material.opacity || 1;

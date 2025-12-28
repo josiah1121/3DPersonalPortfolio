@@ -3,9 +3,17 @@ import * as THREE from 'three';
 import { mouse, isMouseOver } from './cursor.js';
 
 let infoCardRef = null;
+let domeMaterialRef = null;
 
 export function setInfoCard(card) {
   infoCardRef = card;
+}
+
+export function setSkillsDimming(level) {
+  if (domeMaterialRef) {
+    // We use a base opacity of 0.5 as defined in your createGridDome
+    domeMaterialRef.opacity = 0.5 * level;
+  }
 }
 
 function generateParticleTexture() {
@@ -77,6 +85,8 @@ function createGridDome() {
     opacity: 0.5,
     blending: THREE.AdditiveBlending
   });
+
+  domeMaterialRef = lineMaterial;
   domeGroup.userData.lineMaterial = lineMaterial;
 
   for (let i = 0; i < segmentsLat; i++) {

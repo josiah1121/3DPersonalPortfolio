@@ -26,7 +26,8 @@ describe('createInfoCard', () => {
     if (existing) existing.remove();
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, 16/9, 0.1, 1000);
+    // Use 50 FOV to match your "middle ground" desktop setting
+    camera = new THREE.PerspectiveCamera(50, 16/9, 0.1, 1000);
     infoCard = createInfoCard(scene, camera);
   });
 
@@ -50,7 +51,6 @@ describe('createInfoCard', () => {
     
     const overlay = document.getElementById('infocard-html-overlay');
     expect(overlay).not.toBeNull();
-    // Use .contain or check style directly
     expect(overlay.style.display).toBe('block');
   });
 
@@ -61,8 +61,12 @@ describe('createInfoCard', () => {
 
     infoCard.update();
 
-    // Camera at 10, dist is 10, so group should be at 0
-    expect(infoCard.group.position.z).toBeCloseTo(0);
+    /** * UPDATED LOGIC:
+     * Camera is at Z = 10. 
+     * infoCard.js now uses dist = 12.5 for the "middle ground" zoom.
+     * Expected Z = CameraZ - dist => 10 - 12.5 = -2.5
+     */
+    expect(infoCard.group.position.z).toBeCloseTo(-2.5);
     
     const cardMesh = infoCard.group.children.find(c => c.renderOrder === 1000);
     expect(cardMesh.material.opacity).toBeGreaterThan(0);
@@ -73,7 +77,8 @@ describe('createInfoCard', () => {
     infoCard.update(); 
     infoCard.hide();
     
-    for (let i = 0; i < 60; i++) {
+    // Run update loop until lerp finishes
+    for (let i = 0; i < 100; i++) {
       infoCard.update();
     }
 
@@ -95,11 +100,7 @@ describe('createInfoCard', () => {
   });
 
   it('cleans up resources on dispose', () => {
-    // We spy on the prototype/window BEFORE calling dispose
     const removeListenerSpy = vi.spyOn(window, 'removeEventListener');
-    
-    // Create a local reference to the element to check it after dispose
-    const overlayElement = document.getElementById('infocard-html-overlay');
     
     infoCard.dispose();
 
