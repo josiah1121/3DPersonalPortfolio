@@ -343,20 +343,29 @@ export function createInfoCard(scene, camera) {
     currentOpacity += (targetOpacity - currentOpacity) * 0.12;
     currentScale += (targetScale - currentScale) * 0.12;
 
-    // --- RESTORED: RESPONSIVE CAMERA LOGIC ---
     const vFOV = THREE.MathUtils.degToRad(camera.fov);
     const aspect = camera.aspect;
-    let dist = 10; 
+    
+    // "MIDDLE GROUND" DISTANCE
+    // 12.5 is the sweet spot for FOV 45-50
+    let dist = 12.5; 
+
+    // Handle narrow screens/Mobile to ensure the card doesn't bleed off-screen
     if (aspect < 1.6) {
-        const cardWidthWithMargin = 16 * 1.25; 
+        // We use a slightly tighter margin (1.1) to keep it feeling "zoomed in"
+        const cardWidthWithMargin = 16 * 1.1; 
         const hFOV = 2 * Math.atan(Math.tan(vFOV / 2) * aspect);
-        dist = cardWidthWithMargin / (2 * Math.tan(hFOV / 2));
+        const calcDist = cardWidthWithMargin / (2 * Math.tan(hFOV / 2));
+        
+        // Use whichever is further to prevent clipping
+        dist = Math.max(dist, calcDist);
     }
 
     group.position.copy(camera.position);
     group.quaternion.copy(camera.quaternion);
     group.translateZ(-dist);
 
+    // Update visuals
     overlay.scale.set(100, 100, 1); 
     overlayMat.opacity = currentOpacity * 0.85; 
     backdropMat.opacity = currentOpacity * 0.5;
@@ -365,10 +374,11 @@ export function createInfoCard(scene, camera) {
     cardMesh.scale.setScalar(currentScale);
     backdrop.scale.setScalar(currentScale * 1.5);
 
+    // SYNC HTML OVERLAY
     if (group.visible) {
-      const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
-      const visibleWidth = visibleHeight * aspect;
-      const cardPxWidth = (16 * currentScale / visibleWidth) * window.innerWidth;
+      const visibleHeightAtDist = 2 * Math.tan(vFOV / 2) * dist;
+      const visibleWidthAtDist = visibleHeightAtDist * aspect;
+      const cardPxWidth = (16 * currentScale / visibleWidthAtDist) * window.innerWidth;
       overlayContainer.style.width = `${cardPxWidth}px`;
     }
 
