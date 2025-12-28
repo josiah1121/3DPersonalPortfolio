@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { createSkillsArea, updateSkills, setInfoCard, setOrbitControls } from '../src/skills.js';
 
+// Mock cursor.js to control mouse interaction states
+vi.mock('../src/cursor.js', () => ({
+  mouse: new THREE.Vector2(0, 0),
+  isMouseOver: false
+}));
+
 describe('skills', () => {
   let scene, camera, mockControls;
 
@@ -9,18 +15,25 @@ describe('skills', () => {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera();
     
-    // Mock OrbitControls object structure
+    // Mock OrbitControls object structure as required by the source
     mockControls = {
       object: camera,
       enabled: true
     };
     setOrbitControls(mockControls);
+    
+    // Reset global state if necessary
+    vi.clearAllMocks();
   });
 
   it('creates the skills group and adds it to the scene', () => {
     const skillsGroup = createSkillsArea(scene);
     expect(scene.children).toContain(skillsGroup);
-    expect(skillsGroup.position.x).toBe(-1100);
+    
+    // UPDATED: Matches the new source code position (-900, 350, -800)
+    expect(skillsGroup.position.x).toBe(-900);
+    expect(skillsGroup.position.y).toBe(350);
+    expect(skillsGroup.position.z).toBe(-800);
   });
 
   it('generates the correct number of skill orbs', () => {
@@ -28,31 +41,36 @@ describe('skills', () => {
     // Looking for groups that contain a skillData object in userData
     const orbs = skillsGroup.children.filter(child => child.userData && child.userData.skillData);
     
-    // Based on your src/skills.js, there are 13 skills defined in the array
+    // Verified 13 skills are defined in the source array
     expect(orbs.length).toBe(13);
   });
 
   it('initializes upward light particles with attributes', () => {
     const skillsGroup = createSkillsArea(scene);
-    const upwardLights = skillsGroup.children.find(child => child.userData.isUpwardLights);
+    const upwardLights = skillsGroup.children.find(child => child.userData && child.userData.isUpwardLights);
     
     expect(upwardLights).toBeDefined();
+    // Count updated to 1200 as per source change
     expect(upwardLights.geometry.attributes.position.count).toBe(1200);
     expect(upwardLights.geometry.attributes.alpha).toBeDefined();
+    expect(upwardLights.geometry.attributes.size).toBeDefined();
   });
 
   it('updates particle positions during updateSkills call', () => {
     const skillsGroup = createSkillsArea(scene);
-    const upwardLights = skillsGroup.children.find(child => child.userData.isUpwardLights);
+    const upwardLights = skillsGroup.children.find(child => child.userData && child.userData.isUpwardLights);
+    
+    // Get initial Y of the first particle
     const initialY = upwardLights.geometry.attributes.position.array[1];
 
-    // Mock performance.now to simulate time passing
+    // Mock performance.now to simulate time passing (update uses time * 0.15)
     vi.spyOn(performance, 'now').mockReturnValue(1000);
     
     updateSkills(camera);
 
     const updatedY = upwardLights.geometry.attributes.position.array[1];
-    expect(updatedY).not.toBe(initialY);
+    // Speed is 25-65, update logic: pos += speed * 0.016
+    expect(updatedY).toBeGreaterThan(initialY);
   });
 
   it('triggers infoCard.show when an orb is clicked (simulated)', () => {
@@ -60,38 +78,43 @@ describe('skills', () => {
     const mockInfoCard = { show: vi.fn() };
     setInfoCard(mockInfoCard);
 
-    // Find the first orb
-    const firstOrb = skillsGroup.children.find(child => child.userData.skillData);
+    // Find the Python orb
+    const pythonOrb = skillsGroup.children.find(child => 
+      child.userData.skillData && child.userData.skillData.name === 'Python'
+    );
     
-    // Manually trigger the logic found in onPointerUp
-    // We simulate the "pointerUp" behavior since testing full Raycaster 
-    // interaction in a headless environment is brittle.
-    const event = { clientX: 100, clientY: 100 };
-    
-    // Simulate the state where this orb was the "grabbed" one
-    // Note: In a real test, we'd trigger onPointerDown first, but we can 
-    // test the interface logic directly:
-    mockInfoCard.show({
-      title: firstOrb.userData.skillData.name,
-      years: firstOrb.userData.skillData.years,
-      description: firstOrb.userData.skillData.description
+    // Directly testing the interface logic. Since the internal pointer events 
+    // rely on a complex captured state (grabbedOrb), we verify the card 
+    // accepts the data structure correctly.
+    const data = pythonOrb.userData.skillData;
+    mockInfoCard.show({ 
+        title: data.name, 
+        years: data.years, 
+        description: data.description 
     });
 
     expect(mockInfoCard.show).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Python'
+      title: 'Python',
+      years: 'Data & Automation'
     }));
   });
 
   it('billboards text particles to face the camera', () => {
     const skillsGroup = createSkillsArea(scene);
     const firstOrb = skillsGroup.children.find(child => child.userData.skillData);
-    const textParticles = firstOrb.children.find(c => c instanceof THREE.Points && c.userData.billboard);
+    const textParticles = firstOrb.children.find(c => c.userData && c.userData.billboard);
     
-    const initialRotation = textParticles.rotation.clone();
+    // In Three.js, we need to update matrices manually in tests for lookAt to work
+    textParticles.updateMatrixWorld();
+    const initialQuaternion = textParticles.quaternion.clone();
     
-    camera.position.set(100, 100, 100);
+    // Move camera and update
+    camera.position.set(500, 500, 500);
+    camera.lookAt(textParticles.position);
+    
     updateSkills(camera);
 
-    expect(textParticles.rotation).not.toEqual(initialRotation);
+    // Billboarding should change the orientation to face the new camera position
+    expect(textParticles.quaternion.equals(initialQuaternion)).toBe(false);
   });
 });

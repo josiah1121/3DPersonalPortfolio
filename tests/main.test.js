@@ -47,6 +47,11 @@ vi.mock('../src/projects.js', () => ({
     return g;
   }),
   updateTitleLetters: vi.fn(),
+  // ADD THIS: Mock the navigation setup function
+  setupProjectNavigation: vi.fn((camera, controls, projects) => {
+    // Return a mock or just let it be a spy
+    return;
+  }),
   PersonalProject: vi.fn().mockImplementation(function() {
     return {
       addTo: vi.fn(),

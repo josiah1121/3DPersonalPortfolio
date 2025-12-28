@@ -20,7 +20,8 @@ import { createSkillsArea, updateSkills, setOrbitControls, setInfoCard } from '.
 import { createSkillsTitle, updateSkillsTitle } from './src/skillsTitle.js';
 import { createExperienceTitle, updateExperienceTitle } from './src/experienceTitle.js';
 import { createNeonTunnel } from './src/neonTunnel.js';
-import { createProjectsArea, PersonalProject, updateTitleLetters } from './src/projects.js';
+// Added setupProjectNavigation import
+import { createProjectsArea, PersonalProject, updateTitleLetters, setupProjectNavigation } from './src/projects.js';
 import { createLandingPage } from './src/landing.js';
 
 const { createParticles, updateParticles } = Particles;
@@ -94,6 +95,9 @@ function rebuildProjects() {
     proj.addTo(projectsArea);
     billboardProjects.push(proj);
   });
+
+  // Re-initialize navigation with the newly built projects
+  setupProjectNavigation(camera, controls, billboardProjects);
 }
 
 // Initial build
